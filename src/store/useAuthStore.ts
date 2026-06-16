@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null })
 
         // Mode développement : Bypass de l'appel API et acceptation de n'importe quel identifiant
-        if (import.meta.env.DEV) {
+        if (import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true') {
           // Simuler un léger délai réseau pour une meilleure UX (transition fluide)
           await new Promise((resolve) => setTimeout(resolve, 600))
 
