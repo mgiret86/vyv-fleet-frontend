@@ -11,9 +11,9 @@ interface MaintenanceFormProps {
 }
 
 interface FormErrors {
-  vehicleId?:    string
-  type?:         string
-  label?:        string
+  vehicleId?:     string
+  type?:          string
+  label?:         string
   scheduledDate?: string
 }
 
@@ -30,7 +30,6 @@ const MAINTENANCE_STATUSES: { value: MaintenanceRecord['status']; label: string 
   { value: 'COMPLETED',   label: 'Terminée'  },
   { value: 'CANCELLED',   label: 'Annulée'   },
 ]
-
 
 function toDateInputValue(dateStr?: string | null): string {
   if (!dateStr) return ''
@@ -66,7 +65,7 @@ export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }
     setStatus(maintenance?.status ?? 'SCHEDULED')
     setProvider(maintenance?.provider ?? '')
     setEstimatedCost(maintenance?.estimatedCost != null ? String(maintenance.estimatedCost) : '')
-    setRealCost(maintenance?.realCost       != null ? String(maintenance.realCost)       : '')
+    setRealCost(maintenance?.realCost           != null ? String(maintenance.realCost)       : '')
     setMileageAtMaintenance(maintenance?.mileageAtMaintenance != null ? String(maintenance.mileageAtMaintenance) : '')
     setNotes(maintenance?.notes ?? '')
     setErrors({})
@@ -74,9 +73,9 @@ export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }
 
   function validate(): boolean {
     const newErrors: FormErrors = {}
-    if (!vehicleId.trim())    newErrors.vehicleId    = 'Le véhicule est requis.'
-    if (!type)                newErrors.type         = 'Le type est requis.'
-    if (!label.trim())        newErrors.label        = 'Le libellé est requis.'
+    if (!vehicleId.trim())    newErrors.vehicleId     = 'Le véhicule est requis.'
+    if (!type)                newErrors.type          = 'Le type est requis.'
+    if (!label.trim())        newErrors.label         = 'Le libellé est requis.'
     if (!scheduledDate)       newErrors.scheduledDate = 'La date planifiée est requise.'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -86,7 +85,6 @@ export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }
     e.preventDefault()
     if (!validate()) return
 
-    // Récupération des infos véhicule depuis le catalogue mock
     const vehicleInfo = vehicles.find((v) => v.id === vehicleId)
 
     const record: MaintenanceRecord = {
@@ -100,7 +98,7 @@ export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }
       type,
       label:                label.trim(),
       description:          description.trim() || '',
-      scheduledDate: toISO(scheduledDate) ?? scheduledDate,
+      scheduledDate:        toISO(scheduledDate) ?? scheduledDate,
       completedDate:        status === 'COMPLETED' ? (toISO(maintenance?.completedDate) ?? new Date().toISOString()) : null,
       status,
       provider:             provider.trim() || null,

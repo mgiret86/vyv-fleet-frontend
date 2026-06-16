@@ -1,3 +1,5 @@
+export type { Amortization, AmortizationSource, AmortizationStatus, AmortizationEntry, AmortizationFormData } from './amortization'
+
 export interface User {
   id: string
   firstName: string
@@ -33,7 +35,7 @@ export interface Vehicle {
   registration: string
   brand: string
   model: string
-  category: 'AMBULANCE_A' | 'AMBULANCE_B' | 'VSL' | 'TPMR' | 'TAXI' | 'SERVICE'
+  category: string   // id dynamique de VehicleCategory
   status: 'ACTIVE' | 'MAINTENANCE' | 'IMMOBILIZED' | 'DECOMMISSIONED' | 'PENDING_APPROVAL' | 'IN_TRANSFER'
   agencyId: string
   agencyName: string
@@ -48,7 +50,18 @@ export interface Vehicle {
 }
 
 // Types dérivés de Vehicle
-export type VehicleCategory = Vehicle['category']
+export interface VehicleCategory {
+  id:        string
+  label:     string       // Ex : "Ambulance A"
+  code:      string       // Ex : "AMBULANCE_A" — slug immuable, généré à la création
+  color:     string       // Ex : "violet" — clé parmi une palette prédéfinie
+  vatRate:   number       // Taux de TVA applicable (usage futur)
+  isActive:  boolean
+  isSystem:  boolean      // true = catégorie "Hors liste", non supprimable
+  order:     number       // Ordre d'affichage
+  createdAt: string
+  updatedAt: string
+}
 export type VehicleStatus   = Vehicle['status']
 export type VehicleEnergy   = Vehicle['energy']
 
@@ -157,6 +170,13 @@ export interface MaintenanceRecord {
   realCost: number | null
   mileageAtMaintenance: number | null
   notes: string | null
+	  // ─── Amortissement optionnel ──────────────────────────────────
+  amortization?: {
+    enabled:        boolean
+    reference:      string
+    amount:         number        // Montant partiel à amortir (peut être < realCost)
+    durationMonths: number        // 1 à 36 mois
+  } | null
 }
 
 // Types dérivés de MaintenanceRecord
@@ -231,4 +251,111 @@ export interface Fine {
   contestedAt?: string | null
   paidAt?: string | null
   reference?: string
+}
+// ── Cycles de maintenance types ────────────────────────────────────
+
+export interface MaintenanceChecklistItem {
+  id:        string
+  label:     string   // Ex: "Vidange huile moteur"
+  order:     number   // Ordre d'affichage dans la checklist
+}
+
+export type MaintenanceTriggerType =
+  | 'KM_ONLY'    // Kilométrage seul
+  | 'TIME_ONLY'  // Temps seul
+  | 'HYBRID'     // Le premier des deux atteint
+
+export interface MaintenanceTemplate {
+  id:          string
+  name:        string                  // Ex: "Vidange + filtres"
+  description: string                  // Description libre
+  type:        MaintenanceType         // Réutilise le type existant : PREVENTIVE | CORRECTIVE | REGULATORY | SANITAIRE
+  triggerType: MaintenanceTriggerType
+
+  // Déclencheurs (null si non applicable selon triggerType)
+  triggerKm:   number | null           // Ex: 25000 (km)
+  triggerDays: number | null           // Ex: 730 (jours = 2 ans)
+
+  // Checklist des tâches à effectuer
+  checklist:   MaintenanceChecklistItem[]
+
+  // Coût estimé indicatif
+  estimatedCost: number | null
+
+  // Applicable à ces catégories de véhicules (vide = toutes)
+  applicableCategories: string[]   // tableau d'IDs de VehicleCategory
+
+  // Obligatoire (ex: CT, ARS)
+  isMandatory: boolean
+
+  // Métadonnées
+  createdAt:   string
+  updatedAt:   string
+}
+
+// Types dérivés
+export type MaintenanceTrigger = MaintenanceTemplate['triggerType']
+
+// ── Affectation d'un cycle de maintenance à un véhicule ────────────
+
+export interface VehicleMaintenanceAssignment {
+  id:         string
+  vehicleId:  string
+  templateId: string
+
+  // Référence de la dernière intervention réalisée
+  lastDoneDate:    string | null   // ISO date
+  lastDoneMileage: number | null   // km au moment de la dernière intervention
+
+  // Prochaine échéance calculée automatiquement
+  nextDueDate:     string | null   // ISO date (calculée depuis lastDoneDate + triggerDays)
+  nextDueMileage:  number | null   // km (calculé depuis lastDoneMileage + triggerKm)
+
+  // Statut de l'affectation
+  isActive: boolean
+
+  // Métadonnées
+  assignedAt: string   // ISO date
+  updatedAt:  string   // ISO date
+}
+
+export type AssignmentStatus =
+  | 'OK'        // Prochaine échéance lointaine
+  | 'SOON'      // Échéance dans moins de 30 jours ou moins de 2000 km
+  | 'OVERDUE'   // Échéance dépassée
+  | 'UNKNOWN'   // Pas encore de données (jamais fait)
+
+// ── Contrats de financement véhicules ─────────────────────────────
+
+export type VehicleContractType = 'CREDIT_BAIL' | 'LOA' | 'LLD' | 'CREDIT_BANCAIRE' | 'EN_PROPRIETE'
+export type ContractStatus        = 'ACTIVE' | 'TERMINATED' | 'EXPIRED' | 'DRAFT'
+
+export interface VehicleContract {
+  id:                   string
+  vehicleId:            string
+  type:                 VehicleContractType
+  status:               ContractStatus
+  isActive:             boolean
+  lessorName:           string
+  contractRef:          string
+  startDate:            string
+  endDate:              string
+  durationMonths:       number
+  monthlyRentHT:        number
+  deposit:              number
+  residualValue:        number | null
+  startMileage:         number | null
+  contractedKmPerYear:  number | null
+  contractedKmTotal:    number | null
+  excessKmCostPerKm:    number | null
+  monthlyInsuranceCost: number | null
+  includedServices: {
+    maintenance:  boolean
+    tires:        boolean
+    insurance:    boolean
+    assistance:   boolean
+  }
+  notes:     string | null
+  createdAt: string
+  updatedAt: string
 }

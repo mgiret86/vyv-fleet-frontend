@@ -1,7 +1,6 @@
-// EquipmentForm.tsx — avec sélecteur véhicule dynamique et prestataire optionnel
 import { useAppStore } from '@/store/useAppStore'
 import React, { useState, useEffect } from 'react'
-import { X, Stethoscope } from 'lucide-react'
+import { X, Stethoscope, Car, CalendarClock, Wrench } from 'lucide-react'
 import { vehicleService } from '@/lib/services'
 import type { Vehicle } from '@/types'
 import {
@@ -12,188 +11,173 @@ import {
   STATUS_LABELS,
 } from '@/data/mockEquipment'
 
-interface EquipmentFormProps {
-  equipment?: Equipment
-  onClose: () => void
-  onSave: (equipment: Equipment) => void
+// ─── Types ────────────────────────────────────────────────────────
+type FormState = {
+  id:                  string
+  vehicleId:           string
+  vehicleRegistration: string
+  agencyId:            string
+  agencyName:          string
+  category:            EquipmentCategory
+  label:               string
+  serialNumber:        string | null
+  status:              EquipmentStatus
+  installDate:         string | null
+  lastCheckDate:       string
+  nextCheckDate:       string
+  expiryDate:          string | null
+  maintenanceProvider: string
+  notes:               string | null
 }
 
-const NULLABLE_FIELDS: (keyof Equipment)[] = [
-  'serialNumber',
-  'installDate',
-  'expiryDate',
-  'notes',
-]
+type FormErrors = Partial<Record<keyof FormState, string>>
+
+// ─── Constantes ───────────────────────────────────────────────────
+const NULLABLE_FIELDS: (keyof Equipment)[] = ['serialNumber', 'installDate', 'expiryDate', 'notes']
 
 const REQUIRED_FIELDS: { key: keyof Equipment; label: string }[] = [
-  { key: 'vehicleId', label: 'Immatriculation du vehicule' },
-  { key: 'label', label: 'Designation' },
-  { key: 'lastCheckDate', label: 'Date du dernier controle' },
-  { key: 'nextCheckDate', label: 'Date du prochain controle' },
+  { key: 'vehicleId',     label: 'Véhicule'              },
+  { key: 'label',         label: 'Désignation'           },
+  { key: 'lastCheckDate', label: 'Dernier contrôle'      },
+  { key: 'nextCheckDate', label: 'Prochain contrôle'     },
 ]
 
-type FormState = {
-  id: string
-  vehicleId: string
-  vehicleRegistration: string
-  agencyId: string
-  agencyName: string
-  category: EquipmentCategory
-  label: string
-  serialNumber: string | null
-  status: EquipmentStatus
-  installDate: string | null
-  lastCheckDate: string
-  nextCheckDate: string
-  expiryDate: string | null
-  maintenanceProvider: string
-  notes: string | null
-}
-
-const DEFAULT_FORM_STATE: FormState = {
-  id: '',
-  vehicleId: '',
+const DEFAULT_FORM: FormState = {
+  id:                  '',
+  vehicleId:           '',
   vehicleRegistration: '',
-  agencyId: '',
-  agencyName: '',
-  category: 'DEFIBRILLATOR',
-  label: '',
-  serialNumber: null,
-  status: 'OK',
-  installDate: null,
-  lastCheckDate: '',
-  nextCheckDate: '',
-  expiryDate: null,
+  agencyId:            '',
+  agencyName:          '',
+  category:            'DEFIBRILLATOR',
+  label:               '',
+  serialNumber:        null,
+  status:              'OK',
+  installDate:         null,
+  lastCheckDate:       '',
+  nextCheckDate:       '',
+  expiryDate:          null,
   maintenanceProvider: '',
-  notes: null,
+  notes:               null,
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────
 function toIso(dateStr: string | null): string | null {
   if (!dateStr) return null
   return new Date(`${dateStr}T00:00:00.000Z`).toISOString()
 }
 
-function equipmentToFormState(eq: Equipment): FormState {
+function equipmentToForm(eq: Equipment): FormState {
   return {
-    id: eq.id,
-    vehicleId: eq.vehicleId,
+    id:                  eq.id,
+    vehicleId:           eq.vehicleId,
     vehicleRegistration: eq.vehicleRegistration,
-    agencyId: eq.agencyId,
-    agencyName: eq.agencyName,
-    category: eq.category,
-    label: eq.label,
-    serialNumber: eq.serialNumber ?? null,
-    status: eq.status,
-    installDate: eq.installDate ? eq.installDate.split('T')[0] : null,
-    lastCheckDate: eq.lastCheckDate ? eq.lastCheckDate.split('T')[0] : '',
-    nextCheckDate: eq.nextCheckDate ? eq.nextCheckDate.split('T')[0] : '',
-    expiryDate: eq.expiryDate ? eq.expiryDate.split('T')[0] : null,
+    agencyId:            eq.agencyId,
+    agencyName:          eq.agencyName,
+    category:            eq.category,
+    label:               eq.label,
+    serialNumber:        eq.serialNumber ?? null,
+    status:              eq.status,
+    installDate:         eq.installDate ? eq.installDate.split('T')[0] : null,
+    lastCheckDate:       eq.lastCheckDate ? eq.lastCheckDate.split('T')[0] : '',
+    nextCheckDate:       eq.nextCheckDate ? eq.nextCheckDate.split('T')[0] : '',
+    expiryDate:          eq.expiryDate ? eq.expiryDate.split('T')[0] : null,
     maintenanceProvider: eq.maintenanceProvider ?? '',
-    notes: eq.notes ?? null,
+    notes:               eq.notes ?? null,
   }
 }
 
-export default function EquipmentForm({
-  equipment,
-  onClose,
-  onSave,
-}: EquipmentFormProps) {
-  const isEditMode = Boolean(equipment)
-  const agencies = useAppStore((s) => s.agencies)
-
-  const [form, setForm] = useState<FormState>(
-    equipment ? equipmentToFormState(equipment) : DEFAULT_FORM_STATE
+// ─── Sous-composants ──────────────────────────────────────────────
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">
+      {children}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
   )
-  const [errors, setErrors] = useState<Partial<Record<keyof Equipment, string>>>({})
-  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+}
+
+function inputCls(error?: string, disabled?: boolean): string {
+  const base = 'w-full px-3 py-2 text-sm rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent placeholder-gray-300'
+  if (disabled) return `${base} bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200`
+  if (error)    return `${base} border-red-300 bg-red-50/30 text-gray-900`
+  return `${base} border-gray-200 hover:border-gray-300 bg-white text-gray-900`
+}
+
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null
+  return <p className="text-[10px] text-red-500 mt-0.5 font-medium">{msg}</p>
+}
+
+function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <div className="w-1 h-4 rounded-full bg-violet-600" />
+      <Icon className="w-3.5 h-3.5 text-violet-500" />
+      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{label}</span>
+    </div>
+  )
+}
+
+// ─── Composant principal ──────────────────────────────────────────
+interface EquipmentFormProps {
+  equipment?: Equipment
+  onClose:    () => void
+  onSave:     (equipment: Equipment) => void
+}
+
+export default function EquipmentForm({ equipment, onClose, onSave }: EquipmentFormProps) {
+  const isEditMode = Boolean(equipment)
+  const agencies   = useAppStore((s) => s.agencies)
+
+  const [form,            setForm]            = useState<FormState>(equipment ? equipmentToForm(equipment) : DEFAULT_FORM)
+  const [errors,          setErrors]          = useState<FormErrors>({})
+  const [vehicles,        setVehicles]        = useState<Vehicle[]>([])
   const [loadingVehicles, setLoadingVehicles] = useState(false)
 
-  // Charger la liste des véhicules au mount
   useEffect(() => {
     setLoadingVehicles(true)
-    vehicleService.list()
-      .then(setVehicles)
-      .finally(() => setLoadingVehicles(false))
+    vehicleService.list().then(setVehicles).finally(() => setLoadingVehicles(false))
   }, [])
 
-  // Repopuler le formulaire en mode édition
   useEffect(() => {
-    if (equipment) {
-      setForm(equipmentToFormState(equipment))
-    } else {
-      setForm(DEFAULT_FORM_STATE)
-    }
+    setForm(equipment ? equipmentToForm(equipment) : DEFAULT_FORM)
     setErrors({})
   }, [equipment])
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = e.target
     const key = name as keyof FormState
-    setForm((prev) => ({
-      ...prev,
-      [key]: NULLABLE_FIELDS.includes(key as keyof Equipment) && value === ''
-        ? null
-        : value,
+    setForm((p) => ({
+      ...p,
+      [key]: NULLABLE_FIELDS.includes(key as keyof Equipment) && value === '' ? null : value,
     }))
-    if (errors[key as keyof Equipment]) {
-      setErrors((prev) => {
-        const next = { ...prev }
-        delete next[key as keyof Equipment]
-        return next
-      })
-    }
+    setErrors((p) => { const n = { ...p }; delete n[key]; return n })
   }
 
   function handleVehicleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const selectedId = e.target.value
-    const vehicle = vehicles.find((v) => v.id === selectedId)
-    if (!vehicle) {
-      setForm((prev) => ({
-        ...prev,
-        vehicleId: '',
-        vehicleRegistration: '',
-        agencyId: '',
-        agencyName: '',
-      }))
+    const v = vehicles.find((x) => x.id === e.target.value)
+    if (!v) {
+      setForm((p) => ({ ...p, vehicleId: '', vehicleRegistration: '', agencyId: '', agencyName: '' }))
       return
     }
-    const agency = agencies.find((a) => a.id === vehicle.agencyId)
-    setForm((prev) => ({
-      ...prev,
-      vehicleId: vehicle.id,
-      vehicleRegistration: vehicle.registration,
-      agencyId: vehicle.agencyId,
-      agencyName: agency?.name ?? '',
+    const agency = agencies.find((a) => a.id === v.agencyId)
+    setForm((p) => ({
+      ...p,
+      vehicleId:           v.id,
+      vehicleRegistration: v.registration,
+      agencyId:            v.agencyId,
+      agencyName:          agency?.name ?? '',
     }))
-    setErrors((prev) => {
-      const next = { ...prev }
-      delete next.vehicleId
-      return next
-    })
-  }
-
-  function handleAgencyChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const agencyId = e.target.value
-    const agency = agencies.find((a) => a.id === agencyId)
-    setForm((prev) => ({
-      ...prev,
-      agencyId,
-      agencyName: agency ? agency.name : '',
-    }))
+    setErrors((p) => { const n = { ...p }; delete n.vehicleId; return n })
   }
 
   function validate(): boolean {
-    const newErrors: Partial<Record<keyof Equipment, string>> = {}
-    for (const field of REQUIRED_FIELDS) {
-      const value = form[field.key as keyof FormState]
-      if (!value || String(value).trim() === '') {
-        newErrors[field.key] = `Le champ "${field.label}" est obligatoire.`
-      }
+    const errs: FormErrors = {}
+    for (const f of REQUIRED_FIELDS) {
+      const v = form[f.key as keyof FormState]
+      if (!v || String(v).trim() === '') errs[f.key as keyof FormState] = `${f.label} requis`
     }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    setErrors(errs)
+    return Object.keys(errs).length === 0
   }
 
   function handleSave() {
@@ -201,89 +185,58 @@ export default function EquipmentForm({
     const agency = agencies.find((a) => a.id === form.agencyId)
     const saved: Equipment = {
       ...form,
-      id: isEditMode ? form.id : '',
-      agencyName: agency ? agency.name : form.agencyName,
-      serialNumber: form.serialNumber,
-      installDate: toIso(form.installDate),
+      id:            isEditMode ? form.id : '',
+      agencyName:    agency?.name ?? form.agencyName,
+      installDate:   toIso(form.installDate),
       lastCheckDate: toIso(form.lastCheckDate) ?? '',
       nextCheckDate: toIso(form.nextCheckDate) ?? '',
-      expiryDate: toIso(form.expiryDate),
-      notes: form.notes,
+      expiryDate:    toIso(form.expiryDate),
     }
     onSave(saved)
   }
 
-  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (e.target === e.currentTarget) onClose()
-  }
-
-  const inputClass =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 ' +
-    'focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent ' +
-    'placeholder-gray-400'
-
-  const inputErrorClass =
-    'w-full rounded-lg border border-red-400 px-3 py-2 text-sm text-gray-800 ' +
-    'focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent ' +
-    'placeholder-gray-400'
-
-  const labelClass = 'block text-sm font-medium text-gray-700 mb-1'
-
-  function getInputClass(key: keyof Equipment) {
-    return errors[key] ? inputErrorClass : inputClass
-  }
-
   return (
-    <div
-      className="fixed inset-0 bg-gray-900/75 z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
-    >
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="sticky top-0 bg-white z-10 flex items-center justify-between px-6 py-4 border-b border-gray-200 rounded-t-lg">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100">
-              <Stethoscope className="w-5 h-5 text-violet-600" />
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              {isEditMode ? "Modifier l'equipement" : 'Nouvel equipement'}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-5xl flex flex-col overflow-hidden">
+
+        {/* ── En-tête ── */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex-shrink-0">
+          <div className="w-1 h-5 rounded-full bg-violet-600" />
+          <Stethoscope className="w-4 h-4 text-violet-500" />
+          <div className="flex-1">
+            <h2 className="text-sm font-bold text-gray-900">
+              {isEditMode ? "Modifier l'équipement" : 'Nouvel équipement'}
             </h2>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400 mt-0.5">
+              {isEditMode ? 'Modifiez les informations ci-dessous' : 'Renseignez les informations de l\'équipement'}
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-          >
-            <X className="w-5 h-5" />
+          <button type="button" onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors">
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Form Content */}
-        <div className="overflow-y-auto flex-grow p-6 space-y-8">
+        {/* ── Corps — 3 colonnes ── */}
+        <div className="p-5 grid grid-cols-3 gap-x-5">
 
-          {/* Section: Identification */}
-          <section>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-              Identification
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* ══ Col 1 : Identification ══ */}
+          <div className="space-y-3">
+            <SectionHeader icon={Car} label="Identification" />
+            <div className="space-y-2">
 
-              {/* Sélecteur véhicule */}
               <div>
-                <label className={labelClass} htmlFor="vehicleId">
-                  Immatriculation du vehicule
-                  <span className="text-red-500 ml-1">*</span>
-                </label>
+                <FieldLabel required>Véhicule</FieldLabel>
                 <select
-                  id="vehicleId"
                   name="vehicleId"
                   value={form.vehicleId}
                   onChange={handleVehicleChange}
                   disabled={loadingVehicles}
-                  className={`${getInputClass('vehicleId')} disabled:opacity-60 disabled:cursor-not-allowed`}
+                  className={inputCls(errors.vehicleId, loadingVehicles)}
                 >
                   <option value="">
-                    {loadingVehicles ? 'Chargement...' : 'Sélectionner un véhicule'}
+                    {loadingVehicles ? 'Chargement…' : 'Sélectionner un véhicule'}
                   </option>
                   {vehicles.map((v) => (
                     <option key={v.id} value={v.id}>
@@ -291,254 +244,176 @@ export default function EquipmentForm({
                     </option>
                   ))}
                 </select>
-                {errors.vehicleId && (
-                  <p className="mt-1 text-xs text-red-500">{errors.vehicleId}</p>
-                )}
+                <FieldError msg={errors.vehicleId} />
               </div>
 
-              {/* Immatriculation auto-remplie (lecture seule) */}
               <div>
-                <label className={labelClass}>
-                  Immatriculation (auto-remplie)
-                </label>
+                <FieldLabel>Immatriculation</FieldLabel>
                 <input
                   type="text"
                   value={form.vehicleRegistration}
-                  disabled
-                  placeholder="Sélectionner un véhicule ci-dessus"
-                  className={inputClass + ' bg-gray-50 text-gray-500 cursor-not-allowed'}
+                  readOnly
+                  placeholder="Auto-remplie"
+                  className={inputCls(undefined, true)}
                 />
               </div>
 
-              {/* Agence auto-remplie */}
               <div>
-                <label className={labelClass} htmlFor="agencyId">
-                  Agence
-                </label>
-                <select
-                  id="agencyId"
-                  name="agencyId"
-                  value={form.agencyId}
-                  onChange={handleAgencyChange}
-                  disabled={!!form.vehicleId}
-                  className={`${inputClass}${form.vehicleId ? ' bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
-                >
-                  <option value="">Sélectionner une agence</option>
-                  {agencies.map((agency) => (
-                    <option key={agency.id} value={agency.id}>
-                      {agency.name}
-                    </option>
-                  ))}
-                </select>
-                {form.vehicleId && (
-                  <p className="mt-1 text-xs text-gray-400">Rempli automatiquement depuis le véhicule</p>
-                )}
-              </div>
-
-              {/* Catégorie */}
-              <div>
-                <label className={labelClass} htmlFor="category">
-                  Categorie
-                </label>
-                <select
-                  id="category"
-                  name="category"
-                  value={form.category}
-                  onChange={handleChange}
-                  className={inputClass}
-                >
-                  {(Object.keys(CATEGORY_LABELS) as EquipmentCategory[]).map((cat) => (
-                    <option key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Désignation */}
-              <div>
-                <label className={labelClass} htmlFor="label">
-                  Designation
-                  <span className="text-red-500 ml-1">*</span>
-                </label>
+                <FieldLabel>Agence</FieldLabel>
                 <input
-                  id="label"
-                  name="label"
                   type="text"
+                  value={form.agencyName}
+                  readOnly
+                  placeholder="Auto-remplie depuis le véhicule"
+                  className={inputCls(undefined, true)}
+                />
+              </div>
+
+              <div>
+                <FieldLabel>Catégorie</FieldLabel>
+                <select name="category" value={form.category} onChange={handleChange} className={inputCls()}>
+                  {(Object.keys(CATEGORY_LABELS) as EquipmentCategory[]).map((cat) => (
+                    <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <FieldLabel required>Désignation</FieldLabel>
+                <input
+                  type="text"
+                  name="label"
                   value={form.label}
                   onChange={handleChange}
-                  placeholder="Ex: Defibrillateur Zoll AED Plus"
-                  className={getInputClass('label')}
+                  placeholder="Ex : Défibrillateur Zoll AED Plus"
+                  className={inputCls(errors.label)}
                 />
-                {errors.label && (
-                  <p className="mt-1 text-xs text-red-500">{errors.label}</p>
-                )}
+                <FieldError msg={errors.label} />
               </div>
 
-              {/* Numéro de série */}
               <div>
-                <label className={labelClass} htmlFor="serialNumber">
-                  Numero de serie
-                </label>
+                <FieldLabel>Numéro de série</FieldLabel>
                 <input
-                  id="serialNumber"
-                  name="serialNumber"
                   type="text"
+                  name="serialNumber"
                   value={form.serialNumber ?? ''}
                   onChange={handleChange}
-                  placeholder="Ex: SN-2024-00123"
-                  className={inputClass}
+                  placeholder="Ex : SN-2024-00123"
+                  className={inputCls()}
                 />
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Section: Statut et Dates */}
-          <section className="border-t border-gray-200 pt-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-              Statut et Dates
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* ══ Col 2 : Statut & Dates ══ */}
+          <div className="space-y-3">
+            <SectionHeader icon={CalendarClock} label="Statut & Dates" />
+            <div className="space-y-2">
+
               <div>
-                <label className={labelClass} htmlFor="status">
-                  Statut
-                </label>
-                <select
-                  id="status"
-                  name="status"
-                  value={form.status}
-                  onChange={handleChange}
-                  className={inputClass}
-                >
+                <FieldLabel>Statut</FieldLabel>
+                <select name="status" value={form.status} onChange={handleChange} className={inputCls()}>
                   {(Object.keys(STATUS_LABELS) as EquipmentStatus[]).map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABELS[s]}
-                    </option>
+                    <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className={labelClass} htmlFor="installDate">
-                  Date d'installation
-                </label>
+                <FieldLabel>Date d'installation</FieldLabel>
                 <input
-                  id="installDate"
-                  name="installDate"
                   type="date"
+                  name="installDate"
                   value={form.installDate ?? ''}
                   onChange={handleChange}
-                  className={inputClass}
+                  className={inputCls()}
                 />
               </div>
 
               <div>
-                <label className={labelClass} htmlFor="lastCheckDate">
-                  Date du dernier controle
-                  <span className="text-red-500 ml-1">*</span>
-                </label>
+                <FieldLabel required>Dernier contrôle</FieldLabel>
                 <input
-                  id="lastCheckDate"
-                  name="lastCheckDate"
                   type="date"
+                  name="lastCheckDate"
                   value={form.lastCheckDate}
                   onChange={handleChange}
-                  className={getInputClass('lastCheckDate')}
+                  className={inputCls(errors.lastCheckDate)}
                 />
-                {errors.lastCheckDate && (
-                  <p className="mt-1 text-xs text-red-500">{errors.lastCheckDate}</p>
-                )}
+                <FieldError msg={errors.lastCheckDate} />
               </div>
 
               <div>
-                <label className={labelClass} htmlFor="nextCheckDate">
-                  Date du prochain controle
-                  <span className="text-red-500 ml-1">*</span>
-                </label>
+                <FieldLabel required>Prochain contrôle</FieldLabel>
                 <input
-                  id="nextCheckDate"
-                  name="nextCheckDate"
                   type="date"
+                  name="nextCheckDate"
                   value={form.nextCheckDate}
                   onChange={handleChange}
-                  className={getInputClass('nextCheckDate')}
+                  className={inputCls(errors.nextCheckDate)}
                 />
-                {errors.nextCheckDate && (
-                  <p className="mt-1 text-xs text-red-500">{errors.nextCheckDate}</p>
-                )}
+                <FieldError msg={errors.nextCheckDate} />
               </div>
 
               <div>
-                <label className={labelClass} htmlFor="expiryDate">
-                  Date d'expiration
-                </label>
+                <FieldLabel>Date d'expiration</FieldLabel>
                 <input
-                  id="expiryDate"
-                  name="expiryDate"
                   type="date"
+                  name="expiryDate"
                   value={form.expiryDate ?? ''}
                   onChange={handleChange}
-                  className={inputClass}
+                  className={inputCls()}
                 />
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Section: Maintenance */}
-          <section className="border-t border-gray-200 pt-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-              Maintenance
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
+          {/* ══ Col 3 : Maintenance & Notes ══ */}
+          <div className="space-y-3">
+            <SectionHeader icon={Wrench} label="Maintenance & Notes" />
+            <div className="space-y-2">
+
               <div>
-                <label className={labelClass} htmlFor="maintenanceProvider">
-                  Prestataire de maintenance
-                </label>
+                <FieldLabel>Prestataire de maintenance</FieldLabel>
                 <input
-                  id="maintenanceProvider"
-                  name="maintenanceProvider"
                   type="text"
+                  name="maintenanceProvider"
                   value={form.maintenanceProvider}
                   onChange={handleChange}
-                  placeholder="Ex: BioMed Services France"
-                  className={inputClass}
+                  placeholder="Ex : BioMed Services France"
+                  className={inputCls()}
                 />
               </div>
 
               <div>
-                <label className={labelClass} htmlFor="notes">
-                  Notes
-                </label>
+                <FieldLabel>Notes</FieldLabel>
                 <textarea
-                  id="notes"
                   name="notes"
-                  rows={4}
                   value={form.notes ?? ''}
                   onChange={handleChange}
-                  placeholder="Informations complementaires, observations..."
-                  className={inputClass + ' resize-none'}
+                  rows={8}
+                  placeholder="Observations complémentaires, historique…"
+                  className={`${inputCls()} resize-none`}
                 />
               </div>
             </div>
-          </section>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-white z-10 flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 rounded-b-lg">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 transition-colors"
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 transition-colors"
-          >
-            Enregistrer
-          </button>
+        {/* ── Footer ── */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+          <p className="text-[10px] text-gray-400">
+            <span className="text-red-500">*</span> Champs obligatoires
+          </p>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+              Annuler
+            </button>
+            <button type="button" onClick={handleSave}
+              className="px-4 py-2 text-sm font-bold text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-colors">
+              {isEditMode ? 'Mettre à jour' : 'Enregistrer'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

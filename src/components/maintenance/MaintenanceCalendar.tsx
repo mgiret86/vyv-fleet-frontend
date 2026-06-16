@@ -1,23 +1,45 @@
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Calendar, Building2, Wrench, Euro, FileText, User } from 'lucide-react'
 import type { MaintenanceRecord } from '@/types'
 import MaintenanceTypeBadge from './MaintenanceTypeBadge'
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-const MONTHS   = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin',
-                   'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre']
+const MONTHS   = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+]
 
-const typeColors = {
-  PREVENTIVE:  'bg-blue-500',
-  CORRECTIVE:  'bg-red-500',
-  REGULATORY:  'bg-purple-500',
-  SANITAIRE:   'bg-green-500',
-} as const
+const TYPE_DOT: Record<MaintenanceRecord['type'], string> = {
+  PREVENTIVE: 'bg-blue-500',
+  CORRECTIVE: 'bg-orange-500',
+  REGULATORY: 'bg-violet-500',
+  SANITAIRE:  'bg-green-500',
+}
+const TYPE_PILL: Record<MaintenanceRecord['type'], string> = {
+  PREVENTIVE: 'bg-blue-100 text-blue-700',
+  CORRECTIVE: 'bg-orange-100 text-orange-700',
+  REGULATORY: 'bg-violet-100 text-violet-700',
+  SANITAIRE:  'bg-green-100 text-green-700',
+}
 
 interface MaintenanceCalendarProps {
-  maintenances: MaintenanceRecord[]  // ← données déjà filtrées par filterByAgency() dans Maintenance.tsx
-  selectedMaintenanceId: string | null
-  onSelectMaintenance: (id: string | null) => void
+  maintenances:           MaintenanceRecord[]
+  selectedMaintenanceId:  string | null
+  onSelectMaintenance:    (id: string | null) => void
+}
+
+function DataRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0">
+      <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <Icon className="w-3 h-3 text-gray-500" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</p>
+        <div className="text-xs font-semibold text-gray-800 mt-0.5">{value}</div>
+      </div>
+    </div>
+  )
 }
 
 export default function MaintenanceCalendar({
@@ -41,7 +63,6 @@ export default function MaintenanceCalendar({
     return days
   }, [startingDay, daysInMonth])
 
-  // Indexation par jour — basée sur les données reçues en props
   const maintenancesByDay = useMemo(() => {
     const map: Record<number, MaintenanceRecord[]> = {}
     maintenances.forEach((m) => {
@@ -66,122 +87,179 @@ export default function MaintenanceCalendar({
   const isToday = (day: number) =>
     day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+  // Compte total du mois
+  const monthTotal = Object.values(maintenancesByDay).reduce((acc, arr) => acc + arr.length, 0)
 
-      {/* Navigation mois */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-100">
-        <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-          <ChevronLeft className="w-5 h-5 text-gray-600" />
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+
+      {/* ── Navigation mois ── */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50/50">
+        <button onClick={prevMonth}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors">
+          <ChevronLeft className="w-4 h-4" />
         </button>
-        <h3 className="font-semibold text-gray-900">{MONTHS[month]} {year}</h3>
-        <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-          <ChevronRight className="w-5 h-5 text-gray-600" />
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 text-violet-500" />
+            <h3 className="text-sm font-bold text-gray-900">{MONTHS[month]} {year}</h3>
+          </div>
+          {monthTotal > 0 && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-violet-50 text-violet-700 border-violet-200">
+              {monthTotal} intervention{monthTotal > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        <button onClick={nextMonth}
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors">
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
-      {/* En-têtes jours */}
+      {/* ── En-têtes jours ── */}
       <div className="grid grid-cols-7 border-b border-gray-100">
         {WEEKDAYS.map((d) => (
-          <div key={d} className="p-2 text-center text-xs font-semibold text-gray-500">{d}</div>
-        ))}
-      </div>
-
-      {/* Grille calendrier */}
-      <div className="grid grid-cols-7">
-        {calendarDays.map((day, idx) => (
-          <div
-            key={idx}
-            className={`min-h-24 p-1 border-b border-r border-gray-50
-              ${day === null ? 'bg-gray-25' : ''}
-              ${isToday(day ?? 0) ? 'bg-violet-50' : ''}`}
-          >
-            {day !== null && (
-              <>
-                <div className={`text-xs p-1 ${isToday(day) ? 'font-bold text-violet-600' : 'text-gray-500'}`}>
-                  {day}
-                </div>
-                <div className="space-y-1">
-                  {maintenancesByDay[day]?.slice(0, 3).map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => onSelectMaintenance(m.id)}
-                      className={`w-full text-left text-xs px-1 py-0.5 rounded text-white truncate ${typeColors[m.type]}`}
-                    >
-                      {m.vehicleRegistration} · {m.vehicleBrand} {m.vehicleModel}
-                    </button>
-                  ))}
-                  {(maintenancesByDay[day]?.length ?? 0) > 3 && (
-                    <p className="text-xs text-gray-400 px-1">
-                      +{maintenancesByDay[day].length - 3}
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
+          <div key={d} className="py-2 text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+            {d}
           </div>
         ))}
       </div>
 
-      {/* Panneau détail */}
+      {/* ── Grille calendrier ── */}
+      <div className="grid grid-cols-7">
+        {calendarDays.map((day, idx) => {
+          const dayMaintenances = day !== null ? (maintenancesByDay[day] ?? []) : []
+          const todayCell = day !== null && isToday(day)
+
+          return (
+            <div
+              key={idx}
+              className={`min-h-24 p-1.5 border-b border-r border-gray-50 ${
+                day === null ? 'bg-gray-50/40' : todayCell ? 'bg-violet-50/60' : 'bg-white hover:bg-gray-50/50'
+              } transition-colors`}
+            >
+              {day !== null && (
+                <>
+                  {/* Numéro du jour */}
+                  <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold mb-1 ${
+                    todayCell
+                      ? 'bg-violet-600 text-white'
+                      : 'text-gray-500'
+                  }`}>
+                    {day}
+                  </div>
+
+                  {/* Events */}
+                  <div className="space-y-0.5">
+                    {dayMaintenances.slice(0, 3).map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => onSelectMaintenance(m.id)}
+                        className={`w-full text-left flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] font-semibold truncate transition-colors ${
+                          selectedMaintenanceId === m.id
+                            ? `${TYPE_PILL[m.type]} ring-1 ring-offset-0 ring-current`
+                            : `${TYPE_PILL[m.type]} hover:opacity-80`
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${TYPE_DOT[m.type]}`} />
+                        <span className="truncate">{m.vehicleRegistration}</span>
+                      </button>
+                    ))}
+                    {dayMaintenances.length > 3 && (
+                      <p className="text-[10px] font-bold text-gray-400 px-1.5">
+                        +{dayMaintenances.length - 3} autre{dayMaintenances.length - 3 > 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Légende ── */}
+      <div className="flex items-center gap-4 px-5 py-2.5 border-t border-gray-100 bg-gray-50/50">
+        {Object.entries(TYPE_DOT).map(([type, dot]) => (
+          <div key={type} className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${dot}`} />
+            <span className="text-[10px] font-semibold text-gray-400">
+              {type === 'PREVENTIVE' ? 'Préventive' : type === 'CORRECTIVE' ? 'Corrective' : type === 'REGULATORY' ? 'Réglementaire' : 'Sanitaire'}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Panneau détail (slide-in) ── */}
       {selectedMaintenance && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/30" onClick={() => onSelectMaintenance(null)} />
-          <div className="relative w-full max-w-md bg-white shadow-xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between">
-              <h4 className="font-semibold text-gray-900">Detail maintenance</h4>
-              <button onClick={() => onSelectMaintenance(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <div>
-                <p className="text-xs text-gray-500">Vehicule</p>
-                <p className="font-mono font-semibold text-gray-900">{selectedMaintenance.vehicleRegistration}</p>
-                <p className="text-sm text-gray-600">{selectedMaintenance.vehicleBrand} {selectedMaintenance.vehicleModel}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Agence</p>
-                <p className="text-sm text-gray-900">{selectedMaintenance.agencyName}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Intervention</p>
-                <p className="text-sm text-gray-900 font-medium">{selectedMaintenance.label}</p>
-                <div className="mt-1"><MaintenanceTypeBadge type={selectedMaintenance.type} /></div>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Date planifiee</p>
-                <p className="text-sm text-gray-900">
-                  {new Date(selectedMaintenance.scheduledDate).toLocaleDateString('fr-FR', {
-                    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-                  })}
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => onSelectMaintenance(null)} />
+          <div className="relative w-full max-w-sm bg-white shadow-2xl border-l border-gray-100 flex flex-col overflow-hidden">
+
+            {/* En-tête slide */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex-shrink-0">
+              <div className="w-1 h-5 rounded-full bg-violet-600" />
+              <Wrench className="w-4 h-4 text-violet-500" />
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-gray-900 truncate">{selectedMaintenance.label}</h4>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400 mt-0.5">
+                  Détail intervention
                 </p>
               </div>
+              <button onClick={() => onSelectMaintenance(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors flex-shrink-0">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Badge type */}
+            <div className="px-5 py-3 border-b border-gray-100">
+              <MaintenanceTypeBadge type={selectedMaintenance.type} />
+            </div>
+
+            {/* Corps détail */}
+            <div className="flex-1 overflow-y-auto px-5 py-2">
+              <DataRow icon={User} label="Véhicule" value={
+                <div>
+                  <span className="font-mono text-violet-700">{selectedMaintenance.vehicleRegistration}</span>
+                  <span className="text-gray-500 ml-1.5">{selectedMaintenance.vehicleBrand} {selectedMaintenance.vehicleModel}</span>
+                </div>
+              } />
+              <DataRow icon={Building2} label="Agence" value={selectedMaintenance.agencyName} />
+              <DataRow icon={Calendar} label="Date planifiée" value={
+                new Date(selectedMaintenance.scheduledDate).toLocaleDateString('fr-FR', {
+                  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                })
+              } />
               {selectedMaintenance.provider && (
-                <div>
-                  <p className="text-xs text-gray-500">Prestataire</p>
-                  <p className="text-sm text-gray-900">{selectedMaintenance.provider}</p>
-                </div>
+                <DataRow icon={Wrench} label="Prestataire" value={selectedMaintenance.provider} />
               )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500">Cout estime</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {selectedMaintenance.estimatedCost ?? '-'} EUR
-                  </p>
-                </div>
-                {selectedMaintenance.realCost !== null && (
+              <DataRow icon={Euro} label="Coûts" value={
+                <div className="flex items-center gap-3">
                   <div>
-                    <p className="text-xs text-gray-500">Cout reel</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedMaintenance.realCost} EUR</p>
+                    <span className="text-[10px] text-gray-400 block">Estimé</span>
+                    <span className="text-gray-800">
+                      {selectedMaintenance.estimatedCost != null
+                        ? selectedMaintenance.estimatedCost.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })
+                        : '—'}
+                    </span>
                   </div>
-                )}
-              </div>
-              {selectedMaintenance.notes && (
-                <div>
-                  <p className="text-xs text-gray-500">Notes</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">{selectedMaintenance.notes}</p>
+                  {selectedMaintenance.realCost != null && (
+                    <div>
+                      <span className="text-[10px] text-gray-400 block">Réel</span>
+                      <span className="font-bold text-gray-900">
+                        {selectedMaintenance.realCost.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                      </span>
+                    </div>
+                  )}
                 </div>
+              } />
+              {selectedMaintenance.notes && (
+                <DataRow icon={FileText} label="Notes" value={
+                  <p className="text-gray-600 leading-relaxed">{selectedMaintenance.notes}</p>
+                } />
               )}
             </div>
           </div>

@@ -1,5 +1,10 @@
 import type { Vehicle } from '@/types'
 
+/**
+ * Les catégories sont désormais dynamiques (gérées dans Paramètres > Catégories).
+ * Les véhicules mock utilisent temporairement 'cat-hors-liste' (catégorie système).
+ * Une fois vos catégories créées, réaffectez-les depuis la fiche de chaque véhicule.
+ */
 export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 'v-1',
@@ -11,7 +16,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'DIESEL',
     agencyId: 'ag1',
     agencyName: 'VYV Ambulance Lille',
-    category: 'AMBULANCE_A',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: '2025-06-30',
     insuranceExpiry: '2025-03-01',
     nextMaintenanceDate: '2025-01-10',
@@ -29,7 +34,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'DIESEL',
     agencyId: 'ag2',
     agencyName: 'VYV Ambulance Arras',
-    category: 'AMBULANCE_B',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: '2025-09-15',
     insuranceExpiry: '2024-06-15',
     nextMaintenanceDate: '2024-12-05',
@@ -47,7 +52,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'DIESEL',
     agencyId: 'ag1',
     agencyName: 'VYV Ambulance Lille',
-    category: 'VSL',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: null,
     insuranceExpiry: '2026-01-01',
     nextMaintenanceDate: '2025-03-20',
@@ -65,7 +70,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'GASOLINE',
     agencyId: 'ag4',
     agencyName: 'VYV Ambulance Nantes',
-    category: 'TPMR',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: null,
     insuranceExpiry: '2027-05-01',
     nextMaintenanceDate: '2025-02-15',
@@ -83,7 +88,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'DIESEL',
     agencyId: 'ag2',
     agencyName: 'VYV Ambulance Arras',
-    category: 'TPMR',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: null,
     insuranceExpiry: '2025-07-01',
     nextMaintenanceDate: '2025-01-25',
@@ -101,7 +106,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'GASOLINE',
     agencyId: 'ag3',
     agencyName: 'VYV Ambulance Rennes',
-    category: 'TAXI',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: null,
     insuranceExpiry: '2028-01-01',
     nextMaintenanceDate: '2025-03-01',
@@ -119,7 +124,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'HYBRID',
     agencyId: 'ag5',
     agencyName: 'VYV Ambulance Marseille',
-    category: 'SERVICE',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: null,
     insuranceExpiry: '2027-03-01',
     nextMaintenanceDate: '2025-02-20',
@@ -137,7 +142,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'GASOLINE',
     agencyId: 'ag5',
     agencyName: 'VYV Ambulance Marseille',
-    category: 'SERVICE',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: null,
     insuranceExpiry: '2026-02-01',
     nextMaintenanceDate: '2025-01-15',
@@ -155,7 +160,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'DIESEL',
     agencyId: 'ag1',
     agencyName: 'VYV Ambulance Lille',
-    category: 'AMBULANCE_A',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: '2025-04-30',
     insuranceExpiry: '2025-04-01',
     nextMaintenanceDate: '2025-02-01',
@@ -173,7 +178,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'DIESEL',
     agencyId: 'ag1',
     agencyName: 'VYV Ambulance Lille',
-    category: 'AMBULANCE_B',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: '2024-08-01',
     insuranceExpiry: '2023-08-01',
     nextMaintenanceDate: '2024-11-10',
@@ -191,7 +196,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     energy: 'DIESEL',
     agencyId: 'ag3',
     agencyName: 'VYV Ambulance Rennes',
-    category: 'AMBULANCE_A',
+    category: 'cat-hors-liste',
     arsApprovalExpiry: '2026-04-01',
     insuranceExpiry: '2026-04-01',
     nextMaintenanceDate: '2025-02-15',
@@ -200,3 +205,5 @@ export const MOCK_VEHICLES: Vehicle[] = [
     monthlyLeaseCost: 900,
   },
 ]
+
+export default MOCK_VEHICLES;

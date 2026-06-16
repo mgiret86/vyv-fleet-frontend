@@ -63,3 +63,6 @@ export const MOCK_AGENCIES: Agency[] = MOCK_SETTINGS_AGENCIES.map((a) => ({
   phone:   a.phone,
   email:   a.email,
 }))
+
+// --- Contracts ---
+export { MOCK_CONTRACTS } from './mockContracts'

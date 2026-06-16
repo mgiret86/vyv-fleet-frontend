@@ -1,117 +1,107 @@
 import { useAppStore } from '@/store/useAppStore'
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, User, Building2, CreditCard, ShieldCheck, GraduationCap } from 'lucide-react'
 import type { Driver, DriverRole, DriverStatus, ContractType } from '@/types'
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
+// ─── Constants ────────────────────────────────────────────────────
 const ROLES: { value: DriverRole; label: string }[] = [
-  { value: 'AMBULANCIER_DE', label: 'Ambulancier DE' },
+  { value: 'AMBULANCIER_DE',       label: 'Ambulancier DE'        },
   { value: 'AUXILIAIRE_AMBULANCIER', label: 'Auxiliaire Ambulancier' },
-  { value: 'CHAUFFEUR_VSL', label: 'Chauffeur VSL' },
-  { value: 'OTHER', label: 'Autre' },
+  { value: 'CHAUFFEUR_VSL',        label: 'Chauffeur VSL'         },
+  { value: 'OTHER',                label: 'Autre'                 },
 ]
-
 const STATUSES: { value: DriverStatus; label: string }[] = [
-  { value: 'ACTIVE', label: 'Actif' },
-  { value: 'INACTIVE', label: 'Inactif' },
+  { value: 'ACTIVE',    label: 'Actif'    },
+  { value: 'INACTIVE',  label: 'Inactif'  },
   { value: 'SUSPENDED', label: 'Suspendu' },
-  { value: 'LEAVE', label: 'Congé' },
+  { value: 'LEAVE',     label: 'Congé'    },
 ]
-
 const CONTRACTS: { value: ContractType; label: string }[] = [
-  { value: 'CDI', label: 'CDI' },
-  { value: 'CDD', label: 'CDD' },
+  { value: 'CDI',    label: 'CDI'    },
+  { value: 'CDD',    label: 'CDD'    },
   { value: 'INTERIM', label: 'Intérim' },
 ]
 
-// AGENCIES chargées dynamiquement via useAppStore
-
-// ---------------------------------------------------------------------------
-// Interfaces
-// ---------------------------------------------------------------------------
-
+// ─── Interfaces ───────────────────────────────────────────────────
 interface DriverFormProps {
-  isOpen: boolean
+  isOpen:  boolean
   onClose: () => void
   driver?: Driver
-  onSave: (d: Driver) => void
+  onSave:  (d: Driver) => void
 }
-
 interface FormErrors {
-  firstName?: string
-  lastName?: string
-  email?: string
-  phone?: string
-  agencyId?: string
-  role?: string
-  licenseNumber?: string
-  licenseExpiry?: string
+  firstName?: string; lastName?: string; email?: string; phone?: string
+  agencyId?: string; role?: string; licenseNumber?: string; licenseExpiry?: string
 }
 
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-/** Converts an ISO date-time string to the YYYY-MM-DD format required by <input type="date" /> */
 function toDateInputValue(dateStr?: string | null): string {
   return dateStr?.slice(0, 10) ?? ''
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+// ─── Sous-composants ──────────────────────────────────────────────
+function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">
+      {children}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
+  )
+}
+function Field({ error, children }: { error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      {children}
+      {error && <p className="text-[10px] text-red-500 mt-0.5 font-medium">{error}</p>}
+    </div>
+  )
+}
+function inputCls(error?: string) {
+  return `w-full px-3 py-2 text-sm rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent placeholder-gray-300 ${
+    error
+      ? 'border-red-300 bg-red-50/30 text-gray-900'
+      : 'border-gray-200 hover:border-gray-300 bg-white text-gray-900'
+  }`
+}
+function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <div className="w-1 h-4 rounded-full bg-violet-600" />
+      <Icon className="w-3.5 h-3.5 text-violet-500" />
+      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{label}</span>
+    </div>
+  )
+}
 
+// ─── Composant principal ──────────────────────────────────────────
 export default function DriverForm({ isOpen, onClose, driver, onSave }: DriverFormProps) {
-  // ── Personal information ──────────────────────────────────────────────────
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
-
-  // ── Assignment & contract ─────────────────────────────────────────────────
   const agencies = useAppStore((s) => s.agencies)
-  const [agencyId, setAgencyId] = useState('')
-  const [role, setRole] = useState<DriverRole>('AMBULANCIER_DE')
-  const [status, setStatus] = useState<DriverStatus>('ACTIVE')
-  const [contractType, setContractType] = useState<ContractType>('CDI')
 
-  // ── Driving licence ───────────────────────────────────────────────────────
-  const [licenseNumber, setLicenseNumber] = useState('')
-  const [licenseExpiry, setLicenseExpiry] = useState('')
-
-  // ── Health qualifications ─────────────────────────────────────────────────
-  const [deaExpiry, setDeaExpiry] = useState('') // Corrected state declaration
-  const [fspExpiry, setFspExpiry] = useState('')
+  // State
+  const [firstName,                setFirstName]                = useState('')
+  const [lastName,                 setLastName]                 = useState('')
+  const [email,                    setEmail]                    = useState('')
+  const [phone,                    setPhone]                    = useState('')
+  const [address,                  setAddress]                  = useState('')
+  const [agencyId,                 setAgencyId]                 = useState('')
+  const [role,                     setRole]                     = useState<DriverRole>('AMBULANCIER_DE')
+  const [status,                   setStatus]                   = useState<DriverStatus>('ACTIVE')
+  const [contractType,             setContractType]             = useState<ContractType>('CDI')
+  const [licenseNumber,            setLicenseNumber]            = useState('')
+  const [licenseExpiry,            setLicenseExpiry]            = useState('')
+  const [deaExpiry,                setDeaExpiry]                = useState('')
+  const [fspExpiry,                setFspExpiry]                = useState('')
   const [medicalCertificateExpiry, setMedicalCertificateExpiry] = useState('')
-  const [medicalExamDate, setMedicalExamDate] = useState('')
-  const [medicalExamExpiry, setMedicalExamExpiry] = useState('')
+  const [medicalExamDate,          setMedicalExamDate]          = useState('')
+  const [medicalExamExpiry,        setMedicalExamExpiry]        = useState('')
+  const [nextTrainingDate,         setNextTrainingDate]         = useState('')
+  const [errors,                   setErrors]                   = useState<FormErrors>({})
 
-  // ── Continuous training ───────────────────────────────────────────────────
-  const [nextTrainingDate, setNextTrainingDate] = useState('')
-
-  // ── Validation errors ─────────────────────────────────────────────────────
-  const [errors, setErrors] = useState<FormErrors>({})
-
-  // ── Populate / reset fields whenever the modal opens or the driver changes ─
   useEffect(() => {
     if (!isOpen) return
-
     if (driver) {
-      // Edit mode — pre-fill every field from the existing driver record
-      setFirstName(driver.firstName)
-      setLastName(driver.lastName)
-      setEmail(driver.email)
-      setPhone(driver.phone)
-      setAddress(driver.address ?? '')
-      setAgencyId(driver.agencyId)
-      setRole(driver.role)
-      setStatus(driver.status)
-      setContractType(driver.contractType)
-      setLicenseNumber(driver.licenseNumber)
+      setFirstName(driver.firstName); setLastName(driver.lastName)
+      setEmail(driver.email); setPhone(driver.phone); setAddress(driver.address ?? '')
+      setAgencyId(driver.agencyId); setRole(driver.role); setStatus(driver.status)
+      setContractType(driver.contractType); setLicenseNumber(driver.licenseNumber)
       setLicenseExpiry(toDateInputValue(driver.licenseExpiry))
       setDeaExpiry(toDateInputValue(driver.deaExpiry))
       setFspExpiry(toDateInputValue(driver.fspExpiry))
@@ -120,485 +110,231 @@ export default function DriverForm({ isOpen, onClose, driver, onSave }: DriverFo
       setMedicalExamExpiry(toDateInputValue(driver.medicalExamExpiry))
       setNextTrainingDate(toDateInputValue(driver.nextTrainingDate))
     } else {
-      // Create mode — reset everything to sensible defaults
-      setFirstName('')
-      setLastName('')
-      setPhone('') // Corrected line
-      setEmail('')
-      setAddress('')
-      setAgencyId('')
-      setRole('AMBULANCIER_DE')
-      setStatus('ACTIVE')
-      setContractType('CDI')
-      setLicenseNumber('')
-      setLicenseExpiry('')
-      setDeaExpiry('') // Reset for create mode
-      setFspExpiry('')
-      setMedicalCertificateExpiry('')
-      setMedicalExamDate('')
-      setMedicalExamExpiry('')
+      setFirstName(''); setLastName(''); setEmail(''); setPhone(''); setAddress('')
+      setAgencyId(''); setRole('AMBULANCIER_DE'); setStatus('ACTIVE'); setContractType('CDI')
+      setLicenseNumber(''); setLicenseExpiry(''); setDeaExpiry(''); setFspExpiry('')
+      setMedicalCertificateExpiry(''); setMedicalExamDate(''); setMedicalExamExpiry('')
       setNextTrainingDate('')
     }
-
-    // Always clear validation errors when the modal opens
     setErrors({})
   }, [isOpen, driver])
 
-  // ── Validation ────────────────────────────────────────────────────────────
-
   function validate(): boolean {
     const next: FormErrors = {}
-
-    if (!firstName.trim()) next.firstName = 'Le prénom est requis.'
-    if (!lastName.trim()) next.lastName = 'Le nom est requis.'
-
-    if (!email.trim()) {
-      next.email = "L'adresse e-mail est requise."
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      next.email = "L'adresse e-mail n'est pas valide."
-    }
-
-    if (!phone.trim()) next.phone = 'Le numéro de téléphone est requis.'
-    if (!agencyId) next.agencyId = "L'agence est requise."
-    if (!role) next.role = 'Le rôle est requis.'
-    if (!licenseNumber.trim()) next.licenseNumber = 'Le numéro de permis est requis.'
-    if (!licenseExpiry) next.licenseExpiry = "La date d'expiration du permis est requise."
-
+    if (!firstName.trim())   next.firstName    = 'Requis'
+    if (!lastName.trim())    next.lastName     = 'Requis'
+    if (!email.trim())       next.email        = 'Requis'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = 'Email invalide'
+    if (!phone.trim())       next.phone        = 'Requis'
+    if (!agencyId)           next.agencyId     = 'Requis'
+    if (!role)               next.role         = 'Requis'
+    if (!licenseNumber.trim()) next.licenseNumber = 'Requis'
+    if (!licenseExpiry)      next.licenseExpiry = 'Requis'
     setErrors(next)
     return Object.keys(next).length === 0
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!validate()) return
-
-    // Resolve the human-readable agency the selected id
     const selectedAgency = agencies.find((a) => a.id === agencyId)
-
     const record: Driver = {
       id: driver?.id ?? crypto.randomUUID(),
-
-      // Personal information
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
-
-      // Assignment & contract
-      agencyId,
-      agencyName: selectedAgency?.name ?? '',
-      role,
-      status,
-      contractType,
-
-      // Driving licence
-      licenseNumber: licenseNumber.trim(),
-      licenseExpiry,
-
-      // Health qualifications — DEA only relevant for AMBULANCIER_DE
+      firstName: firstName.trim(), lastName: lastName.trim(),
+      email: email.trim(), phone: phone.trim(), address: address.trim(),
+      agencyId, agencyName: selectedAgency?.name ?? '',
+      role, status, contractType,
+      licenseNumber: licenseNumber.trim(), licenseExpiry,
       deaExpiry: role === 'AMBULANCIER_DE' && deaExpiry !== '' ? deaExpiry : null,
       fspExpiry: fspExpiry || null,
       medicalCertificateExpiry: medicalCertificateExpiry || null,
-      medicalExamDate: medicalExamDate || '', // Ensure null if empty
-      medicalExamExpiry: medicalExamExpiry || '', // Ensure null if empty
-
-      // Continuous training
+      medicalExamDate: medicalExamDate || '',
+      medicalExamExpiry: medicalExamExpiry || '',
       nextTrainingDate: nextTrainingDate || null,
-
-      // Statistics — preserved from existing record or initialised to zero
-      totalMileage: driver?.totalMileage ?? 0,
+      totalMileage:   driver?.totalMileage   ?? 0,
       incidentsCount: driver?.incidentsCount ?? 0,
-      incidents: driver?.incidents ?? [],
-      habilitations: driver?.habilitations ?? [],
+      incidents:      driver?.incidents      ?? [],
+      habilitations:  driver?.habilitations  ?? [],
     }
-
     onSave(record)
   }
 
-  // ── Guard — do not mount when closed ─────────────────────────────────────
   if (!isOpen) return null
 
-  // ── Shared class helpers ──────────────────────────────────────────────────
-
-  const inputBase =
-    'w-full rounded-lg border border-gray-200 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500'
-  const inputError = 'border-red-400 bg-red-50'
-
-  function inputCls(hasError?: string) {
-    return `${inputBase} ${hasError ? inputError : ''}`.trim()
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
-    /* Overlay */
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      {/* Panel */}
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-5xl flex flex-col overflow-hidden">
 
-        {/* ── Sticky header ── */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 rounded-t-2xl">
-          <h2 className="text-base font-semibold text-gray-800">
-            {driver ? 'Modifier le conducteur' : 'Nouveau conducteur'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fermer"
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-          >
-            <X size={18} />
+        {/* ── En-tête ── */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex-shrink-0">
+          <div className="w-1 h-5 rounded-full bg-violet-600" />
+          <User className="w-4 h-4 text-violet-500" />
+          <div className="flex-1">
+            <h2 className="text-sm font-bold text-gray-900">
+              {driver ? 'Modifier le conducteur' : 'Nouveau conducteur'}
+            </h2>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400 mt-0.5">
+              {driver ? 'Modifiez les informations ci-dessous' : 'Renseignez les informations du conducteur'}
+            </p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors">
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* ── Form ── */}
+        {/* ── Corps — grille 3 colonnes ── */}
         <form onSubmit={handleSubmit} noValidate>
-          <div className="px-6 py-6 space-y-6">
+          <div className="p-5 grid grid-cols-3 gap-x-5 gap-y-0">
 
-            {/* ════════════════════════════════════════════════════════════
-                SECTION 1 — Personal════════════════════════════════════════════════════════════ */}
-            <section>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Informations personnelles
-              </h3>
-
-              {/* firstName + lastName */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Prénom <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className={inputCls(errors.firstName)}
-                    placeholder="Jean"
-                  />
-                  {errors.firstName && (
-                    <p className="text-xs text-red-500 mt-1">{errors.firstName}</p>
-                  )}
+            {/* ══ Col 1 : Identité ══ */}
+            <div className="space-y-3">
+              <SectionHeader icon={User} label="Informations personnelles" />
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <Field error={errors.firstName}>
+                    <Label required>Prénom</Label>
+                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="Jean" className={inputCls(errors.firstName)} />
+                  </Field>
+                  <Field error={errors.lastName}>
+                    <Label required>Nom</Label>
+                    <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Dupont" className={inputCls(errors.lastName)} />
+                  </Field>
                 </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Nom <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className={inputCls(errors.lastName)}
-                    placeholder="Dupont"
-                  />
-                  {errors.lastName && (
-                    <p className="text-xs text-red-500 mt-1">{errors.lastName}</p>
-                  )}
-                </div>
+                <Field error={errors.email}>
+                  <Label required>E-mail</Label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                    placeholder="jean.dupont@vyv.fr" className={inputCls(errors.email)} />
+                </Field>
+                <Field error={errors.phone}>
+                  <Label required>Téléphone</Label>
+                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                    placeholder="06 12 34 56 78" className={inputCls(errors.phone)} />
+                </Field>
+                <Field>
+                  <Label>Adresse</Label>
+                  <input type="text" value={address} onChange={(e) => setAddress(e.target.value)}
+                    placeholder="12 rue de la Paix, 75001 Paris" className={inputCls()} />
+                </Field>
               </div>
+            </div>
 
-              {/* email + phone */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    E-mail <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={inputCls(errors.email)}
-                    placeholder="jean.dupont@vyv.fr"
-                  />
-                  {errors.email && ( // Corrected JSX for error display
-                    <p className="text-xs text-red-500 mt-1">{errors.email}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Téléphone <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className={inputCls(errors.phone)}
-                    placeholder="06 12 34 56 78"
-                  />
-                  {errors.phone && (
-                    <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* address */}
+            {/* ══ Col 2 : Affectation + Permis ══ */}
+            <div className="space-y-3">
+              {/* Affectation & contrat */}
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  Adresse
-                </label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className={inputCls()}
-                  placeholder="12 rue de la Paix, 75001 Paris"
-                />
-              </div>
-            </section>
-
-            {/* ════════════════════════════════════════════════════════════
-                SECTION 2 — Assignment & contract
-            ════════════════════════════════════════════════════════════ */}
-            <section className="border-t pt-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Affectation &amp; contrat
-              </h3>
-
-              {/* agencyId + role + status */}
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Agence <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={agencyId}
-                    onChange={(e) => setAgencyId(e.target.value)}
-                    className={inputCls(errors.agencyId)}
-                  >
-                    <option value="">Sélectionner…</option>
-                    {agencies.map((a) => (
-                      <option key={a.id} value={a.id}> {/* Corrected value attribute */}
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.agencyId && (
-                    <p className="text-xs text-red-500 mt-1">{errors.agencyId}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Rôle <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as DriverRole)}
-                    className={inputCls(errors.role)}
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.role && (
-                    <p className="text-xs text-red-500 mt-1">{errors.role}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Statut
-                  </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as DriverStatus)}
-                    className={inputCls()}
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                <SectionHeader icon={Building2} label="Affectation & contrat" />
+                <div className="space-y-2">
+                  <Field error={errors.agencyId}>
+                    <Label required>Agence</Label>
+                    <select value={agencyId} onChange={(e) => setAgencyId(e.target.value)} className={inputCls(errors.agencyId)}>
+                      <option value="">Sélectionner…</option>
+                      {agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </Field>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field error={errors.role}>
+                      <Label required>Rôle</Label>
+                      <select value={role} onChange={(e) => setRole(e.target.value as DriverRole)} className={inputCls(errors.role)}>
+                        {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field>
+                      <Label>Statut</Label>
+                      <select value={status} onChange={(e) => setStatus(e.target.value as DriverStatus)} className={inputCls()}>
+                        {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                    </Field>
+                  </div>
+                  <Field>
+                    <Label>Type de contrat</Label>
+                    <select value={contractType} onChange={(e) => setContractType(e.target.value as ContractType)} className={inputCls()}>
+                      {CONTRACTS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </Field>
                 </div>
               </div>
 
-              {/* contractType + placeholder for alignment */}
-              <div className="grid grid-cols-2 gap-4"> {/* Corrected closing div */}
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Type de contrat
-                  </label>
-                  <select
-                    value={contractType}
-                    onChange={(e) => setContractType(e.target.value as ContractType)}
-                    className={inputCls()}
-                  >
-                    {CONTRACTS.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* Empty column to maintain alignment */}
-                <div></div> {/* Corrected empty div */}
-              </div>
-            </section>
-
-            {/* ════════════════════════════════════════════════════════════
-                SECTION 3 — Driving licence
-            ════════════════════════════════════════════════════════════ */}
-            <section className="border-t pt-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Permis de conduire
-              </h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Numéro de permis <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={licenseNumber}
-                    onChange={(e) => setLicenseNumber(e.target.value)}
-                    className={inputCls(errors.licenseNumber)}
-                    placeholder="75AB12345"
-                  />
-                  {errors.licenseNumber && (
-                    <p className="text-xs text-red-500 mt-1">{errors.licenseNumber}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Date d'expiration <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={licenseExpiry}
-                    onChange={(e) => setLicenseExpiry(e.target.value)}
-                    className={inputCls(errors.licenseExpiry)}
-                  />
-                  {errors.licenseExpiry && (
-                    <p className="text-xs text-red-500 mt-1">{errors.licenseExpiry}</p>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* ════════════════════════════════════════════════════════════
-                SECTION 4 — Health qualifications
-            ════════════════════════════════════════════════════════════ */}
-            <section className="border-t pt-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Habilitations sanitaires
-              </h3>
-
-              {/* DEA — only relevant for AMBULANCIER_DE */}
-              {role === 'AMBULANCIER_DE' && (
-                <div className="mb-4"> {/* Corrected className */}
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Expiration DEA
-                  </label>
-                  <input
-                    type="date"
-                    value={deaExpiry}
-                    onChange={(e) => setDeaExpiry(e.target.value)}
-                    className={inputCls()}
-                  />
-                </div>
-              )}
-
-              {/* FSP + medical certificate */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Expiration FSP
-                  </label>
-                  <input
-                    type="date"
-                    value={fspExpiry}
-                    onChange={(e) => setFspExpiry(e.target.value)}
-                    className={inputCls()}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Certificat médical d'aptitude
-                  </label>
-                  <input
-                    type="date"
-                    value={medicalCertificateExpiry}
-                    onChange={(e) => setMedicalCertificateExpiry(e.target.value)}
-                    className={inputCls()}
-                  />
-                </div>
-              </div>
-
-              {/* Medical exam date + expiry */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Date visite médicale
-                  </label>
-                  <input
-                    type="date"
-                    value={medicalExamDate}
-                    onChange={(e) => setMedicalExamDate(e.target.value)}
-                    className={inputCls()}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-1 block">
-                    Expiration visite médicale
-                  </label>
-                  <input
-                    type="date"
-                    value={medicalExamExpiry}
-                    onChange={(e) => setMedicalExamExpiry(e.target.value)}
-                    className={inputCls()}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* ════════════════════════════════
-                SECTION 5 — Continuous training
-            ════════════════════════════════════════════════════════════ */}
-            <section className="border-t pt-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                Formation continue
-              </h3>
-
+              {/* Permis de conduire */}
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-1 block">
-                  Prochaine formation
-                </label>
-                <input
-                  type="date"
-                  value={nextTrainingDate}
-                  onChange={(e) => setNextTrainingDate(e.target.value)}
-                  className={inputCls()}
-                />
+                <SectionHeader icon={CreditCard} label="Permis de conduire" />
+                <div className="space-y-2">
+                  <Field error={errors.licenseNumber}>
+                    <Label required>Numéro de permis</Label>
+                    <input type="text" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)}
+                      placeholder="75AB12345" className={inputCls(errors.licenseNumber)} />
+                  </Field>
+                  <Field error={errors.licenseExpiry}>
+                    <Label required>Date d'expiration</Label>
+                    <input type="date" value={licenseExpiry} onChange={(e) => setLicenseExpiry(e.target.value)}
+                      className={inputCls(errors.licenseExpiry)} />
+                  </Field>
+                </div>
               </div>
-            </section>
+            </div>
+
+            {/* ══ Col 3 : Habilitations + Formation ══ */}
+            <div className="space-y-3">
+              {/* Habilitations sanitaires */}
+              <div>
+                <SectionHeader icon={ShieldCheck} label="Habilitations sanitaires" />
+                <div className="space-y-2">
+                  {role === 'AMBULANCIER_DE' && (
+                    <Field>
+                      <Label>Expiration DEA</Label>
+                      <input type="date" value={deaExpiry} onChange={(e) => setDeaExpiry(e.target.value)} className={inputCls()} />
+                    </Field>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field>
+                      <Label>Expiration FSP</Label>
+                      <input type="date" value={fspExpiry} onChange={(e) => setFspExpiry(e.target.value)} className={inputCls()} />
+                    </Field>
+                    <Field>
+                      <Label>Certificat médical</Label>
+                      <input type="date" value={medicalCertificateExpiry} onChange={(e) => setMedicalCertificateExpiry(e.target.value)} className={inputCls()} />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field>
+                      <Label>Visite médicale</Label>
+                      <input type="date" value={medicalExamDate} onChange={(e) => setMedicalExamDate(e.target.value)} className={inputCls()} />
+                    </Field>
+                    <Field>
+                      <Label>Exp. visite médicale</Label>
+                      <input type="date" value={medicalExamExpiry} onChange={(e) => setMedicalExamExpiry(e.target.value)} className={inputCls()} />
+                    </Field>
+                  </div>
+                </div>
+              </div>
+
+              {/* Formation continue */}
+              <div>
+                <SectionHeader icon={GraduationCap} label="Formation continue" />
+                <Field>
+                  <Label>Prochaine formation</Label>
+                  <input type="date" value={nextTrainingDate} onChange={(e) => setNextTrainingDate(e.target.value)} className={inputCls()} />
+                </Field>
+              </div>
+            </div>
           </div>
 
-          {/* ── Footer actions ── */}
-          <div className="sticky bottom-0 flex justify-end gap-3 px-6 py-4 bg-white border-t border-gray-200 rounded-b-2xl">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 transition-colors"
-            >
-              {driver ? 'Mettre à jour' : 'Enregistrer'}
-            </button>
+          {/* ── Footer ── */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+            <p className="text-[10px] text-gray-400">
+              <span className="text-red-500">*</span> Champs obligatoires
+            </p>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onClose}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                Annuler
+              </button>
+              <button type="submit"
+                className="px-4 py-2 text-sm font-bold text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-colors">
+                {driver ? 'Mettre à jour' : 'Enregistrer'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

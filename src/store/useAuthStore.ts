@@ -50,6 +50,55 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email, password, rememberMe) => {
         set({ isLoading: true, error: null })
+
+        // Mode développement : Bypass de l'appel API et acceptation de n'importe quel identifiant
+        if (import.meta.env.DEV) {
+          // Simuler un léger délai réseau pour une meilleure UX (transition fluide)
+          await new Promise((resolve) => setTimeout(resolve, 600))
+
+          const mockDevUser: AuthUser = {
+            id: 'dev-user-id',
+            firstName: 'Thomas',
+            lastName: 'Martin (Dev)',
+            email: email || 'thomas.martin@vyv-fleet.fr',
+            role: 'SUPER_ADMIN',
+            roleId: 'SUPER_ADMIN',
+            agencyIds: ['ag1', 'ag2', 'ag3', 'ag4', 'ag5'],
+            permissions: [
+              { module: 'dashboard', action: 'view' },
+              { module: 'vehicles', action: 'view' },
+              { module: 'vehicles', action: 'create' },
+              { module: 'vehicles', action: 'edit' },
+              { module: 'vehicles', action: 'delete' },
+              { module: 'drivers', action: 'view' },
+              { module: 'drivers', action: 'create' },
+              { module: 'drivers', action: 'edit' },
+              { module: 'drivers', action: 'delete' },
+              { module: 'maintenance', action: 'view' },
+              { module: 'maintenance', action: 'create' },
+              { module: 'maintenance', action: 'edit' },
+              { module: 'compliance', action: 'view' },
+              { module: 'fuel', action: 'view' },
+              { module: 'incidents', action: 'view' },
+              { module: 'settings', action: 'view' },
+              { module: 'settings', action: 'edit' },
+            ]
+          }
+
+          const hours = rememberMe ? 24 : get().settings.sessionDurationHours
+          set({
+            currentUser: mockDevUser,
+            accessToken: 'mock-dev-access-token',
+            refreshToken: 'mock-dev-refresh-token',
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+            hasHydrated: true,
+            sessionExpiresAt: Date.now() + hours * 3600000,
+          })
+          return
+        }
+
         try {
           const { data } = await authApi.post<ApiResponse<{
             accessToken: string

@@ -1,13 +1,11 @@
-import type { VehicleCategory, VehicleStatus, AlertSeverity, MaintenanceStatus, Role } from '@/types'
+import type { VehicleStatus, AlertSeverity, MaintenanceStatus, Role } from '@/types'
 
-export const VEHICLE_CATEGORY_LABELS: Record<VehicleCategory, string> = {
-  AMBULANCE_A: 'Ambulance A',
-  AMBULANCE_B: 'Ambulance B',
-  VSL:         'VSL',
-  TPMR:        'TPMR',
-  TAXI:        'Taxi conventionné',
-  SERVICE:     'Véhicule de service',
-}
+/**
+ * VEHICLE_CATEGORY_LABELS a été supprimé.
+ * Les labels de catégories sont désormais dynamiques — utilisez :
+ *   const { getById } = useVehicleCategoryStore()
+ *   getById(categoryId)?.label ?? 'Hors liste'
+ */
 
 export const VEHICLE_STATUS_LABELS: Record<VehicleStatus, string> = {
   ACTIVE:           'Actif',
@@ -53,7 +51,6 @@ export const MAINTENANCE_STATUS_COLORS: Record<MaintenanceStatus, string> = {
   CANCELLED:   'bg-gray-100 text-gray-600 border-gray-200',
 }
 
-// Role = 'ADMIN' | 'MANAGER' | 'DRIVER' (depuis @/types)
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN:   'Administrateur',
   MANAGER: 'Responsable',
