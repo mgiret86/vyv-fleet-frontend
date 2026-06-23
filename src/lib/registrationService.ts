@@ -19,6 +19,7 @@ export interface VehicleRegistrationData {
   seats:                     number | null
   ptac:                      number | null
   co2:                       number | null
+	nationalGenre: string | null   // Genre national J.1 (ex : VASP, DERIV VP)
   color:                     string | null
   vin:                       string | null
   bodyType:                  string | null
@@ -47,6 +48,7 @@ const MOCK_DB: Record<string, VehicleRegistrationData> = {
     seats: 3, ptac: 3100, co2: 172, color: 'Blanc',
     vin: 'VF3XBYHZJLS123456', bodyType: 'Fourgon', doors: 4, power: 107,
     cylinderCount: 4, gearbox: 'Manuelle',
+		nationalGenre: 'VASP',
   },
   'EF-456-GH': {
     registration: 'EF-456-GH', brand: 'Renault', model: 'Trafic',
@@ -55,6 +57,7 @@ const MOCK_DB: Record<string, VehicleRegistrationData> = {
     seats: 9, ptac: 2980, co2: 185, color: 'Blanc',
     vin: 'VF1FL000567890123', bodyType: 'Minibus', doors: 5, power: 88,
     cylinderCount: 4, gearbox: 'Manuelle',
+		nationalGenre: 'VASP',
   },
   'IJ-789-KL': {
     registration: 'IJ-789-KL', brand: 'Citroën', model: 'Jumpy',
@@ -63,6 +66,7 @@ const MOCK_DB: Record<string, VehicleRegistrationData> = {
     seats: 3, ptac: 3100, co2: 163, color: 'Gris',
     vin: 'VF7VEBHYBML654321', bodyType: 'Fourgon', doors: 4, power: 110,
     cylinderCount: 4, gearbox: 'Automatique',
+		nationalGenre: 'VASP',
   },
 }
 
@@ -73,6 +77,7 @@ const MOCK_DEFAULT: Omit<VehicleRegistrationData, 'registration'> = {
   seats: 3, ptac: 3500, co2: 195, color: 'Blanc',
   vin: 'WDB9066351S123789', bodyType: 'Fourgon', doors: 4, power: 105,
   cylinderCount: 4, gearbox: 'Manuelle',
+	nationalGenre: 'VASP',
 }
 
 // ── Utilitaires ────────────────────────────────────────────────────
@@ -109,24 +114,26 @@ function mapApiResponse(json: Record<string, unknown>, plate: string): VehicleRe
   }
 
   return {
-    registration:              plate,
-    brand:                     String(json['marque']                    ?? json['brand']            ?? ''),
-    model:                     String(json['modele']                    ?? json['model']            ?? ''),
-    version:                   json['version']           ? String(json['version'])           : null,
-    energy:                    mapEnergy(json['energie'] ?? json['energy']  ?? json['carburant']),
-    firstRegistrationDate:     parseDate(json['date_mise_en_circulation'] ?? json['first_registration']),
-    technicalInspectionExpiry: parseDate(json['date_fin_ct']              ?? json['ct_expiry']),
-    seats:                     json['nb_places']   != null ? Number(json['nb_places'])   : null,
-    ptac:                      json['ptac']        != null ? Number(json['ptac'])        : null,
-    co2:                       json['co2']         != null ? Number(json['co2'])         : null,
-    color:                     json['couleur']     ? String(json['couleur'])     : null,
-    vin:                       json['vin']         ? String(json['vin'])         : null,
-    bodyType:                  json['carrosserie'] ? String(json['carrosserie']) : null,
-    doors:                     json['nb_portes']   != null ? Number(json['nb_portes'])   : null,
-    power:                     json['puissance_kw']!= null ? Number(json['puissance_kw']): null,
-    cylinderCount:             json['nb_cylindres']!= null ? Number(json['nb_cylindres']): null,
-    gearbox:                   json['boite_vitesse']? String(json['boite_vitesse'])      : null,
-  }
+  registration:              plate,
+  brand:                     String(json['marque']                    ?? json['brand']            ?? ''),
+  model:                     String(json['modele']                    ?? json['model']            ?? ''),
+  version:                   json['version']           ? String(json['version'])                  : null,
+  energy:                    mapEnergy(json['energie'] ?? json['energy'] ?? json['carburant']),
+  firstRegistrationDate:     parseDate(json['date_mise_en_circulation'] ?? json['first_registration']),
+  technicalInspectionExpiry: parseDate(json['date_fin_ct']              ?? json['ct_expiry']),
+  seats:                     json['nb_places']    != null ? Number(json['nb_places'])              : null,
+  ptac:                      json['ptac']         != null ? Number(json['ptac'])                   : null,
+  co2:                       json['co2']          != null ? Number(json['co2'])                    : null,
+  nationalGenre:             json['genre_national']      ? String(json['genre_national'])          : null,
+  color:                     json['couleur']             ? String(json['couleur'])                 : null,
+  vin:                       json['vin']                 ? String(json['vin'])                     : null,
+  bodyType:                  json['carrosserie']         ? String(json['carrosserie'])             : null,
+  doors:                     json['nb_portes']    != null ? Number(json['nb_portes'])              : null,
+  power:                     json['puissance_kw'] != null ? Number(json['puissance_kw'])           : null,
+  cylinderCount:             json['nb_cylindres'] != null ? Number(json['nb_cylindres'])           : null,
+  gearbox:                   json['boite_vitesse']       ? String(json['boite_vitesse'])           : null,
+}
+
 }
 
 // ── Appel API réel ─────────────────────────────────────────────────

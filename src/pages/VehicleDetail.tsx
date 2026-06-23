@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Truck, Award, Car, Calendar, Fuel, Building2 } from 'lucide-react'
+import { ArrowLeft, Edit, Truck, Award, Car, Calendar, Fuel, Building2, FileText, Radio, Cpu } from 'lucide-react'
 import { useVehicleStore }         from '@/store/vehicleStore'
 import Button                      from '@/components/ui/Button'
 import VehicleCategoryBadge        from '@/components/vehicles/VehicleCategoryBadge'
@@ -85,13 +85,28 @@ export default function VehicleDetail() {
   }
 
   const score      = vehicle.complianceScore
-  const scoreColor = score >= 80 ? 'text-green-600 bg-green-50 border-green-200' : score >= 60 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200'
+  const scoreColor = score >= 80
+    ? 'text-green-600 bg-green-50 border-green-200'
+    : score >= 60
+      ? 'text-amber-600 bg-amber-50 border-amber-200'
+      : 'text-red-600 bg-red-50 border-red-200'
 
   const TABS = [
     { id: 'info'        as DetailTab, label: 'Informations'          },
     { id: 'maintenance' as DetailTab, label: 'Cycles de maintenance' },
     { id: 'finance'     as DetailTab, label: 'Contrat & Financement' },
   ]
+
+  // Vérifie si au moins un champ carte grise est renseigné
+  const hasCarteGrise =
+    vehicle.color        ||
+    vehicle.vin          ||
+    vehicle.nationalGenre ||
+    vehicle.co2Emission  ||
+    vehicle.seatingCapacity
+
+  // Vérifie si au moins un IMEI est renseigné
+  const hasTelematics = vehicle.imeiPda || vehicle.imeiTelematics
 
   return (
     <>
@@ -124,12 +139,24 @@ export default function VehicleDetail() {
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-violet-300 text-xs font-mono font-semibold">{vehicle.registration}</span>
+                {vehicle.vin && (
+                  <>
+                    <span className="text-violet-500 text-xs">·</span>
+                    <span className="text-violet-400 text-xs font-mono">VIN : {vehicle.vin}</span>
+                  </>
+                )}
                 <span className="text-violet-500 text-xs">·</span>
                 <Building2 className="w-3.5 h-3.5 text-violet-400" />
                 <span className="text-violet-300 text-xs">{vehicle.agencyName}</span>
                 <span className="text-violet-500 text-xs">·</span>
                 <Fuel className="w-3.5 h-3.5 text-violet-400" />
                 <span className="text-violet-300 text-xs">{ENERGY_LABELS[vehicle.energy] ?? vehicle.energy}</span>
+                {vehicle.color && (
+                  <>
+                    <span className="text-violet-500 text-xs">·</span>
+                    <span className="text-violet-300 text-xs">{vehicle.color}</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -185,36 +212,110 @@ export default function VehicleDetail() {
               <div className="w-1 h-4 rounded-full bg-violet-600" />
               <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Fiche technique & échéances</span>
             </div>
-            <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-              {/* Informations générales */}
-              <div className="bg-gray-50/60 rounded-xl p-4 border border-gray-100">
-                <div className="flex items-center gap-2 mb-3">
-                  <Car className="w-4 h-4 text-violet-500" />
-                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Informations générales</span>
+            <div className="p-5 flex flex-col gap-5">
+
+              {/* ── Ligne 1 : Infos générales + Échéances ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                {/* Informations générales */}
+                <div className="bg-gray-50/60 rounded-xl p-4 border border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Car className="w-4 h-4 text-violet-500" />
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Informations générales</span>
+                  </div>
+                  <InfoRow label="Énergie"                value={ENERGY_LABELS[vehicle.energy] ?? vehicle.energy} />
+                  <InfoRow label="Kilométrage"             value={`${vehicle.mileage.toLocaleString('fr-FR')} km`} />
+                  <InfoRow label="Agence"                  value={vehicle.agencyName} />
+                  <InfoRow
+                    label="Coût mensuel (leasing)"
+                    value={vehicle.monthlyLeaseCost
+                      ? `${vehicle.monthlyLeaseCost.toLocaleString('fr-FR')} €`
+                      : 'Non applicable'}
+                  />
                 </div>
-                <InfoRow label="Énergie"              value={ENERGY_LABELS[vehicle.energy] ?? vehicle.energy} />
-                <InfoRow label="Kilométrage"           value={`${vehicle.mileage.toLocaleString('fr-FR')} km`} />
-                <InfoRow label="Agence"                value={vehicle.agencyName} />
-                <InfoRow
-                  label="Coût mensuel (leasing)"
-                  value={vehicle.monthlyLeaseCost
-                    ? `${vehicle.monthlyLeaseCost.toLocaleString('fr-FR')} €`
-                    : 'Non applicable'}
-                />
+
+                {/* Échéances administratives */}
+                <div className="bg-gray-50/60 rounded-xl p-4 border border-gray-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Calendar className="w-4 h-4 text-violet-500" />
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Échéances administratives</span>
+                  </div>
+                  <ExpiryRow label="Agrément ARS"          date={vehicle.arsApprovalExpiry}         />
+                  <ExpiryRow label="Assurance"              date={vehicle.insuranceExpiry}           />
+                  <ExpiryRow label="Contrôle technique"     date={vehicle.technicalInspectionExpiry} />
+                  <ExpiryRow label="Prochaine maintenance"  date={vehicle.nextMaintenanceDate}       />
+                </div>
               </div>
 
-              {/* Échéances administratives */}
+              {/* ── Ligne 2 : Données carte grise ── */}
               <div className="bg-gray-50/60 rounded-xl p-4 border border-gray-100">
                 <div className="flex items-center gap-2 mb-3">
-                  <Calendar className="w-4 h-4 text-violet-500" />
-                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Échéances administratives</span>
+                  <FileText className="w-4 h-4 text-violet-500" />
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Données carte grise</span>
+                  {!hasCarteGrise && (
+                    <span className="ml-auto text-[10px] text-gray-400 italic">Non renseignées — modifiez le véhicule pour les compléter</span>
+                  )}
                 </div>
-                <ExpiryRow label="Agrément ARS"         date={vehicle.arsApprovalExpiry}         />
-                <ExpiryRow label="Assurance"             date={vehicle.insuranceExpiry}           />
-                <ExpiryRow label="Contrôle technique"    date={vehicle.technicalInspectionExpiry} />
-                <ExpiryRow label="Prochaine maintenance" date={vehicle.nextMaintenanceDate}       />
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Couleur</span>
+                    <span className="text-sm font-semibold text-gray-800">{vehicle.color ?? '—'}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Code VIN (E)</span>
+                    <span className="text-sm font-semibold text-gray-800 font-mono break-all">{vehicle.vin ?? '—'}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Genre national (J.1)</span>
+                    <span className="text-sm font-semibold text-gray-800">{vehicle.nationalGenre ?? '—'}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">CO₂ g/km (V.7)</span>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {vehicle.co2Emission != null ? `${vehicle.co2Emission} g/km` : '—'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Places assises (S.1)</span>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {vehicle.seatingCapacity != null ? `${vehicle.seatingCapacity} place${vehicle.seatingCapacity > 1 ? 's' : ''}` : '—'}
+                    </span>
+                  </div>
+                </div>
               </div>
+
+              {/* ── Ligne 3 : Matériels embarqués ── */}
+              <div className="bg-gray-50/60 rounded-xl p-4 border border-gray-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <Radio className="w-4 h-4 text-violet-500" />
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Matériels embarqués</span>
+                  {!hasTelematics && (
+                    <span className="ml-auto text-[10px] text-gray-400 italic">Non renseignés — modifiez le véhicule pour les compléter</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg border border-gray-100">
+                    <Cpu className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">N° IMEI PDA</span>
+                      <span className={`text-sm font-semibold font-mono ${vehicle.imeiPda ? 'text-gray-800' : 'text-gray-400'}`}>
+                        {vehicle.imeiPda ?? '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg border border-gray-100">
+                    <Radio className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">N° IMEI Boitier Télématique</span>
+                      <span className={`text-sm font-semibold font-mono ${vehicle.imeiTelematics ? 'text-gray-800' : 'text-gray-400'}`}>
+                        {vehicle.imeiTelematics ?? '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </>
         )}

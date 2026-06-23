@@ -90,12 +90,27 @@ export default function VehiclePlateScanner({ isOpen, onClose, onBack, onConfirm
   }
 
   function mapToVehicle(data: VehicleRegistrationData): Partial<Vehicle> {
-    return {
-      registration: data.registration, brand: data.brand, model: data.model,
-      energy: data.energy as VehicleEnergy, category: guessCategoryId(data.ptac),
-      technicalInspectionExpiry: data.technicalInspectionExpiry ?? '',
-      mileage: 0, complianceScore: 100, status: 'PENDING_APPROVAL',
-      arsApprovalExpiry: null, insuranceExpiry: '', nextMaintenanceDate: null, monthlyLeaseCost: null,
+  return {
+    // ── Champs de base ──────────────────────────────────────────
+    registration:              data.registration,
+    brand:                     data.brand,
+    model:                     data.model,
+    energy:                    data.energy as VehicleEnergy,
+    category:                  guessCategoryId(data.ptac),
+    technicalInspectionExpiry: data.technicalInspectionExpiry ?? '',
+    mileage:                   0,
+    complianceScore:           100,
+    status:                    'PENDING_APPROVAL',
+    arsApprovalExpiry:         null,
+    insuranceExpiry:           '',
+    nextMaintenanceDate:       null,
+    monthlyLeaseCost:          null,
+    // ── Données carte grise (nouveaux champs) ───────────────────
+    color:                     data.color          ?? null,
+    vin:                       data.vin            ?? null,
+    nationalGenre:             data.nationalGenre  ?? null,
+    co2Emission:               data.co2            ?? null,
+    seatingCapacity:           data.seats          ?? null,
     }
   }
 
@@ -299,6 +314,12 @@ export default function VehiclePlateScanner({ isOpen, onClose, onBack, onConfirm
                       <span className="text-xs font-semibold text-gray-700">{result.color}</span>
                     </InfoRow>
                   )}
+
+									{result.nationalGenre && (
+  									<InfoRow icon={Car} label="Genre national (J.1)">
+    									<span className="text-xs font-semibold text-gray-700">{result.nationalGenre}</span>
+  									</InfoRow>
+									)}
 
                   {result.seats && (
                     <InfoRow icon={Car} label="Places">

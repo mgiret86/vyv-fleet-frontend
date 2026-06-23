@@ -8,7 +8,7 @@ import { useVehicleStore }         from '@/store/vehicleStore'
 import { useAppStore }             from '@/store/useAppStore'
 import { useVehicleCategoryStore } from '@/store/vehicleCategoryStore'
 import type { Vehicle } from '@/types'
-import { Truck, Gauge, CalendarClock, Info } from 'lucide-react'
+import { Truck, Gauge, CalendarClock, Info, FileText, Radio } from 'lucide-react'
 
 // ── Zod schema ─────────────────────────────────────────────────────
 const vehicleSchema = z.object({
@@ -24,6 +24,15 @@ const vehicleSchema = z.object({
   insuranceExpiry:           z.string().min(1, 'Requis'),
   technicalInspectionExpiry: z.string().min(1, 'Requis'),
   nextMaintenanceDate:       z.string().nullable(),
+  // ── Données carte grise ────────────────────────────────────────
+  color:                     z.string().nullable(),
+  vin:                       z.string().nullable(),
+  nationalGenre:             z.string().nullable(),
+  co2Emission:               z.coerce.number().nullable(),
+  seatingCapacity:           z.coerce.number().int().nullable(),
+  // ── Matériels embarqués ───────────────────────────────────────
+  imeiPda:                   z.string().nullable(),
+  imeiTelematics:            z.string().nullable(),
 })
 
 type VehicleFormData = z.infer<typeof vehicleSchema>
@@ -32,6 +41,8 @@ const INITIAL: VehicleFormData = {
   registration: '', brand: '', model: '', category: '', energy: 'DIESEL',
   agencyId: '', mileage: 0, monthlyLeaseCost: null, arsApprovalExpiry: null,
   insuranceExpiry: '', technicalInspectionExpiry: '', nextMaintenanceDate: null,
+  color: null, vin: null, nationalGenre: null, co2Emission: null,
+  seatingCapacity: null, imeiPda: null, imeiTelematics: null,
 }
 
 interface VehicleFormProps {
@@ -96,7 +107,6 @@ export default function VehicleForm({ isOpen, onClose, vehicle }: VehicleFormPro
   const { fetchCategories }           = useVehicleCategoryStore()
   const toast                         = useToast()
 
-  // Sélecteur stable : référence directe au tableau du store
   const rawCategories = useVehicleCategoryStore((s) => s.categories)
   const categories    = rawCategories
     .filter((c) => c.isActive && !c.isSystem)
@@ -108,7 +118,6 @@ export default function VehicleForm({ isOpen, onClose, vehicle }: VehicleFormPro
   const { formData, errors, handleChange, handleSubmit, resetForm, setFormData } =
     useForm<VehicleFormData>(vehicleSchema, INITIAL)
 
-  // ✅ FIX : adaptateur event natif → signature (name, value) de useForm
   const handleFieldChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       handleChange(e.target.name, e.target.value)
@@ -116,12 +125,11 @@ export default function VehicleForm({ isOpen, onClose, vehicle }: VehicleFormPro
     [handleChange]
   )
 
-  // ✅ FIX : lecture snapshot via getState() — pas de tableau dérivé dans les deps
   useEffect(() => {
     if (!isOpen) return
     if (vehicle) {
-      const snap         = useVehicleCategoryStore.getState().categories.filter((c) => c.isActive)
-      const rawCategory  = vehicle.category ?? INITIAL.category
+      const snap             = useVehicleCategoryStore.getState().categories.filter((c) => c.isActive)
+      const rawCategory      = vehicle.category ?? INITIAL.category
       const resolvedCategory =
         snap.find((c) => c.id    === rawCategory)?.id ??
         snap.find((c) => c.label === rawCategory)?.id ??
@@ -140,11 +148,18 @@ export default function VehicleForm({ isOpen, onClose, vehicle }: VehicleFormPro
         insuranceExpiry:           vehicle.insuranceExpiry           ?? INITIAL.insuranceExpiry,
         technicalInspectionExpiry: vehicle.technicalInspectionExpiry ?? INITIAL.technicalInspectionExpiry,
         nextMaintenanceDate:       vehicle.nextMaintenanceDate       ?? INITIAL.nextMaintenanceDate,
+        color:                     vehicle.color                     ?? INITIAL.color,
+        vin:                       vehicle.vin                       ?? INITIAL.vin,
+        nationalGenre:             vehicle.nationalGenre             ?? INITIAL.nationalGenre,
+        co2Emission:               vehicle.co2Emission               ?? INITIAL.co2Emission,
+        seatingCapacity:           vehicle.seatingCapacity           ?? INITIAL.seatingCapacity,
+        imeiPda:                   vehicle.imeiPda                   ?? INITIAL.imeiPda,
+        imeiTelematics:            vehicle.imeiTelematics            ?? INITIAL.imeiTelematics,
       })
     } else {
       resetForm()
     }
-  }, [isOpen, vehicle]) // ← uniquement isOpen et vehicle
+  }, [isOpen, vehicle])
 
   const onSubmit = async (data: VehicleFormData) => {
     const agencyName = agencies.find((a) => a.id === data.agencyId)?.name ?? 'Inconnu'
@@ -379,6 +394,99 @@ export default function VehicleForm({ isOpen, onClose, vehicle }: VehicleFormPro
                 value={formData.nextMaintenanceDate ?? ''}
                 onChange={handleFieldChange}
                 error={errors.nextMaintenanceDate}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Données carte grise ── */}
+        <div className="border-t border-gray-100 pt-4">
+          <SectionHeader icon={FileText} label="Données carte grise" />
+          <div className="grid grid-cols-5 gap-x-4 gap-y-2.5">
+            <div>
+              <Label>Couleur</Label>
+              <Input
+                name="color"
+                value={formData.color ?? ''}
+                onChange={handleFieldChange}
+                error={errors.color}
+                placeholder="Ex : Blanc"
+                className={isPrefilled('color') ? 'border-violet-300 bg-violet-50/40' : ''}
+              />
+            </div>
+            <div>
+              <Label>Code VIN (E)</Label>
+              <Input
+                name="vin"
+                value={formData.vin ?? ''}
+                onChange={handleFieldChange}
+                error={errors.vin}
+                placeholder="17 caractères"
+                className={isPrefilled('vin') ? 'border-violet-300 bg-violet-50/40' : ''}
+              />
+            </div>
+            <div>
+              <Label>Genre national (J.1)</Label>
+              <Input
+                name="nationalGenre"
+                value={formData.nationalGenre ?? ''}
+                onChange={handleFieldChange}
+                error={errors.nationalGenre}
+                placeholder="Ex : VASP"
+                className={isPrefilled('nationalGenre') ? 'border-violet-300 bg-violet-50/40' : ''}
+              />
+            </div>
+            <div>
+              <Label>CO₂ g/km (V.7)</Label>
+              <Input
+                type="number"
+                name="co2Emission"
+                value={formData.co2Emission ?? ''}
+                onChange={handleFieldChange}
+                error={errors.co2Emission}
+                placeholder="Ex : 120"
+                min={0}
+                className={isPrefilled('co2Emission') ? 'border-violet-300 bg-violet-50/40' : ''}
+              />
+            </div>
+            <div>
+              <Label>Places assises (S.1)</Label>
+              <Input
+                type="number"
+                name="seatingCapacity"
+                value={formData.seatingCapacity ?? ''}
+                onChange={handleFieldChange}
+                error={errors.seatingCapacity}
+                placeholder="Ex : 3"
+                min={1}
+                className={isPrefilled('seatingCapacity') ? 'border-violet-300 bg-violet-50/40' : ''}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Matériels embarqués ── */}
+        <div className="border-t border-gray-100 pt-4">
+          <SectionHeader icon={Radio} label="Matériels embarqués" />
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+            <div>
+              <Label>N° IMEI PDA</Label>
+              <Input
+                name="imeiPda"
+                value={formData.imeiPda ?? ''}
+                onChange={handleFieldChange}
+                error={errors.imeiPda}
+                placeholder="15 chiffres"
+              />
+            </div>
+            <div>
+              <Label>N° IMEI Boitier Télématique</Label>
+              <Input
+                name="imeiTelematics"
+                value={formData.imeiTelematics ?? ''}
+                onChange={handleFieldChange}
+                error={errors.imeiTelematics}
+                placeholder="15 chiffres"
               />
             </div>
           </div>

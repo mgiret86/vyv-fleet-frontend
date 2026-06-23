@@ -47,6 +47,15 @@ export interface Vehicle {
   technicalInspectionExpiry: string
   complianceScore: number
   monthlyLeaseCost: number | null
+  // ── Données carte grise ──────────────────────────────────────
+  color:           string | null   // Couleur du véhicule
+  vin:             string | null   // Code VIN (E)
+  nationalGenre:   string | null   // Genre national (J.1)
+  co2Emission:     number | null   // Émission CO2 g/km (V.7)
+  seatingCapacity: number | null   // Nombre de places assises (S.1)
+  // ── Matériels embarqués ──────────────────────────────────────
+  imeiPda:         string | null   // N° IMEI PDA
+  imeiTelematics:  string | null   // N° IMEI Boitier Télématique
 }
 
 // Types dérivés de Vehicle
