@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, X, Calendar, Building2, Wrench, Euro, FileText, User } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Calendar, Building2, Wrench, Euro, FileText, User, TrendingDown } from 'lucide-react'
 import type { MaintenanceRecord } from '@/types'
 import MaintenanceTypeBadge from './MaintenanceTypeBadge'
+import { useAmortizationStore } from '@/store/amortizationStore'
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const MONTHS   = [
@@ -48,6 +49,7 @@ export default function MaintenanceCalendar({
   onSelectMaintenance,
 }: MaintenanceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date())
+  const amortizations = useAmortizationStore((s) => s.amortizations)
 
   const year  = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -81,6 +83,9 @@ export default function MaintenanceCalendar({
 
   const selectedMaintenance = selectedMaintenanceId
     ? maintenances.find((m) => m.id === selectedMaintenanceId)
+    : null
+  const linkedAmort = selectedMaintenanceId
+    ? amortizations.find((a) => a.source === 'MAINTENANCE' && a.sourceId === selectedMaintenanceId)
     : null
 
   const today   = new Date()
@@ -260,6 +265,38 @@ export default function MaintenanceCalendar({
                 <DataRow icon={FileText} label="Notes" value={
                   <p className="text-gray-600 leading-relaxed">{selectedMaintenance.notes}</p>
                 } />
+              )}
+              {linkedAmort && (
+                <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingDown className="w-3.5 h-3.5 text-violet-600" />
+                    <span className="text-[10px] font-bold text-violet-700 uppercase tracking-wide">Amortissement lié</span>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Référence</span>
+                      <span className="font-semibold text-gray-800">{linkedAmort.reference}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Montant</span>
+                      <span className="font-semibold text-gray-800">{linkedAmort.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Durée</span>
+                      <span className="font-semibold text-gray-800">{linkedAmort.durationMonths} mois</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Dotation / mois</span>
+                      <span className="font-bold text-violet-700">{(linkedAmort.amount / linkedAmort.durationMonths).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Statut</span>
+                      <span className={`font-semibold ${linkedAmort.status === 'ACTIVE' ? 'text-green-600' : 'text-gray-400'}`}>
+                        {linkedAmort.status === 'ACTIVE' ? 'Actif' : 'Clôturé'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>

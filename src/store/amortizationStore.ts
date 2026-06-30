@@ -1,17 +1,7 @@
 import { create }  from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Amortization, AmortizationFormData } from '@/types'
-import { MOCK_AMORTIZATIONS, buildAmortizationEntries } from '@/data/mockAmortizations'
-
-const USE_MOCK = true
-
-function now(): string { return new Date().toISOString() }
-function generateId(): string {
-  return `amort-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-}
-function fakeFetch<T>(data: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(structuredClone(data)), 150))
-}
+import { get as apiGet, post as apiPost, put as apiPut } from '@/lib/api'
 
 // ─── Interface du store ───────────────────────────────────────────
 interface AmortizationState {
@@ -19,27 +9,28 @@ interface AmortizationState {
   isLoading:     boolean
   error:         string | null
 
-  fetchAmortizations:      ()                                          => Promise<void>
-  getByVehicle:            (vehicleId: string)                        => Amortization[]
-  getActiveByVehicle:      (vehicleId: string)                        => Amortization[]
-  addAmortization:         (data: AmortizationFormData)               => Promise<Amortization>
+  fetchAmortizations:      ()                                                => Promise<void>
+  getByVehicle:            (vehicleId: string)                               => Amortization[]
+  getActiveByVehicle:      (vehicleId: string)                               => Amortization[]
+  addAmortization:         (data: AmortizationFormData)                      => Promise<Amortization>
   updateAmortization:      (id: string, data: Partial<AmortizationFormData>) => Promise<void>
-  closeAmortization:       (id: string, closedAt?: string)            => Promise<void>
-  closeByVehicle:          (vehicleId: string, closedAt?: string)     => Promise<void>
+  closeAmortization:       (id: string, closedAt?: string)                   => Promise<void>
+  closeByVehicle:          (vehicleId: string, closedAt?: string)            => Promise<void>
 
   // Calculs TCO
-  getMonthlyDotation:      (vehicleId: string, month?: string)        => number
-  getTotalDotationToDate:  (vehicleId: string)                        => number
-  getVNC:                  (vehicleId: string)                        => number
+  getMonthlyDotation:     (vehicleId: string, month?: string) => number
+  getTotalDotationToDate: (vehicleId: string)                 => number
+  getVNC:                 (vehicleId: string)                 => number
 
-  // Vérification déclenchement auto crédit-bail
+  // Déclenchement auto crédit-bail
   triggerCreditBailAmortization: (
-    vehicleId:      string,
-    contractId:     string,
-    residualValue:  number,
+    vehicleId:       string,
+    contractId:      string,
+    residualValue:   number,
     contractEndDate: string,
   ) => Promise<Amortization | null>
 }
+
 
 export const useAmortizationStore = create<AmortizationState>()(
   persist(
@@ -50,12 +41,9 @@ export const useAmortizationStore = create<AmortizationState>()(
 
       // ─── Fetch ──────────────────────────────────────────────────
       fetchAmortizations: async () => {
-        const existing = get().amortizations
-        if (USE_MOCK && existing.length > 0) return
-
         set({ isLoading: true, error: null })
         try {
-          const data = await fakeFetch(MOCK_AMORTIZATIONS)
+          const data = await apiGet<Amortization[]>('/amortizations')
           set({ amortizations: data, isLoading: false })
         } catch (err: unknown) {
           set({ error: err instanceof Error ? err.message : 'Erreur', isLoading: false })
@@ -75,69 +63,41 @@ export const useAmortizationStore = create<AmortizationState>()(
 
       // ─── Création ───────────────────────────────────────────────
       addAmortization: async (data) => {
-        const entries = buildAmortizationEntries(data.startDate, data.amount, data.durationMonths)
-        const amort: Amortization = {
-          id:             generateId(),
-          vehicleId:      data.vehicleId,
-          source:         data.source,
-          sourceId:       data.sourceId,
-          reference:      data.reference,
-          label:          data.label,
-          amount:         data.amount,
-          startDate:      data.startDate,
-          durationMonths: data.durationMonths,
-          status:         'ACTIVE',
-          closedAt:       null,
-          entries,
-          createdAt:      now(),
-          updatedAt:      now(),
-        }
-        if (USE_MOCK) console.info('[MOCK] addAmortization', amort)
+        const amort = await apiPost<Amortization>('/amortizations', data)
         set((s) => ({ amortizations: [...s.amortizations, amort] }))
         return amort
       },
 
       // ─── Mise à jour ─────────────────────────────────────────────
       updateAmortization: async (id, data) => {
+        const amort = await apiPut<Amortization>(`/amortizations/${id}`, data)
         set((s) => ({
-          amortizations: s.amortizations.map((a) => {
-            if (a.id !== id) return a
-            const updated = { ...a, ...data, updatedAt: now() }
-            // Recalcul des entrées si montant ou durée changés
-            if (data.amount !== undefined || data.durationMonths !== undefined) {
-              updated.entries = buildAmortizationEntries(
-                updated.startDate,
-                updated.amount,
-                updated.durationMonths,
-              )
-            }
-            return updated
-          }),
+          amortizations: s.amortizations.map((a) => a.id === id ? amort : a),
         }))
       },
 
       // ─── Clôture individuelle ────────────────────────────────────
-      closeAmortization: async (id, closedAt) => {
-        const closeDate = closedAt ?? now()
+      closeAmortization: async (id, _closedAt) => {
+        const amort = await apiPut<Amortization>(`/amortizations/${id}/close`, {})
         set((s) => ({
-          amortizations: s.amortizations.map((a) =>
-            a.id !== id
-              ? a
-              : { ...a, status: 'CLOSED', closedAt: closeDate, updatedAt: now() }
-          ),
+          amortizations: s.amortizations.map((a) => a.id === id ? amort : a),
         }))
       },
 
-      // ─── Clôture de tous les amortissements d'un véhicule (cession) ──
-      closeByVehicle: async (vehicleId, closedAt) => {
-        const closeDate = closedAt ?? now()
-        set((s) => ({
-          amortizations: s.amortizations.map((a) =>
-            a.vehicleId !== vehicleId || a.status === 'CLOSED'
-              ? a
-              : { ...a, status: 'CLOSED', closedAt: closeDate, updatedAt: now() }
-          ),
-        }))
+      // ─── Clôture de tous les amortissements d'un véhicule ────────
+      closeByVehicle: async (vehicleId, _closedAt) => {
+        const targets = get().amortizations.filter(
+          (a) => a.vehicleId === vehicleId && a.status === 'ACTIVE'
+        )
+        await Promise.all(
+          targets.map((a) =>
+            apiPut<Amortization>(`/amortizations/${a.id}/close`, {}).then((updated) =>
+              set((s) => ({
+                amortizations: s.amortizations.map((x) => x.id === a.id ? updated : x),
+              }))
+            )
+          )
+        )
       },
 
       // ─── TCO : dotation mensuelle (mois courant par défaut) ──────
@@ -146,7 +106,6 @@ export const useAmortizationStore = create<AmortizationState>()(
           const d = new Date()
           return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
         })()
-
         return get()
           .amortizations
           .filter((a) => a.vehicleId === vehicleId && a.status === 'ACTIVE')
@@ -160,7 +119,6 @@ export const useAmortizationStore = create<AmortizationState>()(
       getTotalDotationToDate: (vehicleId) => {
         const today = new Date()
         const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-
         return get()
           .amortizations
           .filter((a) => a.vehicleId === vehicleId)
@@ -170,11 +128,10 @@ export const useAmortizationStore = create<AmortizationState>()(
           }, 0)
       },
 
-      // ─── VNC : montant restant à amortir sur tous les amortissements actifs ──
+      // ─── VNC : montant restant à amortir ─────────────────────────
       getVNC: (vehicleId) => {
         const today = new Date()
         const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-
         return get()
           .amortizations
           .filter((a) => a.vehicleId === vehicleId && a.status === 'ACTIVE')
@@ -187,17 +144,15 @@ export const useAmortizationStore = create<AmortizationState>()(
       },
 
       // ─── Déclenchement auto crédit-bail ──────────────────────────
-      // À appeler quand contractEndDate est dépassée et qu'aucun amortissement
-      // CREDIT_BAIL n'existe déjà pour ce contrat
       triggerCreditBailAmortization: async (vehicleId, contractId, residualValue, contractEndDate) => {
         const existing = get().amortizations.find(
           (a) => a.source === 'CREDIT_BAIL' && a.sourceId === contractId
         )
-        if (existing) return null // Déjà créé, pas de doublon
+        if (existing) return null
 
         const startDate = (() => {
           const d = new Date(contractEndDate)
-          d.setDate(d.getDate() + 1) // J+1
+          d.setDate(d.getDate() + 1)
           return d.toISOString().split('T')[0]
         })()
 
@@ -209,12 +164,15 @@ export const useAmortizationStore = create<AmortizationState>()(
           label:          'Valeur résiduelle — Crédit-bail',
           amount:         residualValue,
           startDate,
-          durationMonths: 12, // Valeur par défaut, ajustable manuellement
+          durationMonths: 12,
         }
 
         return get().addAmortization(data)
       },
     }),
-    { name: 'vyv-amortizations', version: 1 }
+    {
+      name:    'vyv-amortizations',
+      version: 2, // Incrémenté pour invalider le cache local (données mock)
+    }
   )
 )

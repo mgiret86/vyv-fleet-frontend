@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Truck, Award, Car, Calendar, Fuel, Building2, FileText, Radio, Cpu } from 'lucide-react'
-import { useVehicleStore }         from '@/store/vehicleStore'
+import { ArrowLeft, Edit, Truck, Award, Car, Calendar, Fuel, Building2, FileText, Radio, Cpu, ShieldCheck } from 'lucide-react'
+import { useVehicleStore }                from '@/store/vehicleStore'
+import { relaisService }                  from '@/lib/dataService'
+import { useMaintenanceTemplateStore }   from '@/store/maintenanceTemplateStore'
+import { useVehicleMaintenanceStore }    from '@/store/vehicleMaintenanceStore'
 import Button                      from '@/components/ui/Button'
 import VehicleCategoryBadge        from '@/components/vehicles/VehicleCategoryBadge'
 import VehicleStatusBadge          from '@/components/vehicles/VehicleStatusBadge'
@@ -9,6 +12,7 @@ import VehicleForm                 from '@/components/vehicles/VehicleForm'
 import VehicleStatusModal          from '@/components/vehicles/VehicleStatusModal'
 import VehicleMaintenanceTab       from '@/components/vehicles/VehicleMaintenanceTab'
 import VehicleFinanceTab           from '@/components/vehicles/VehicleFinanceTab'
+import VehicleSubstitutionTab      from '@/components/vehicles/VehicleSubstitutionTab'
 
 // ── Helpers ────────────────────────────────────────────────────────
 const ENERGY_LABELS: Record<string, string> = {
@@ -18,7 +22,7 @@ const ENERGY_LABELS: Record<string, string> = {
   GASOLINE: 'Essence',
 }
 
-type DetailTab = 'info' | 'maintenance' | 'finance'
+type DetailTab = 'info' | 'maintenance' | 'finance' | 'mouvements'
 
 function getDays(date: string | null | undefined): number | null {
   if (!date) return null
@@ -65,8 +69,18 @@ function ExpiryRow({ label, date }: { label: string; date: string | null | undef
 export default function VehicleDetail() {
   const { id }       = useParams<{ id: string }>()
   const navigate     = useNavigate()
-  const { vehicles } = useVehicleStore()
+  const { vehicles, updateVehicle } = useVehicleStore()
   const vehicle      = vehicles.find((v) => v.id === id)
+
+  const { fetchTemplates } = useMaintenanceTemplateStore()
+  const { fetchByVehicle } = useVehicleMaintenanceStore()
+
+  useEffect(() => {
+    if (id) {
+      fetchTemplates()
+      fetchByVehicle(id)
+    }
+  }, [id])
 
   const [activeTab,         setActiveTab]         = useState<DetailTab>('info')
   const [isFormModalOpen,   setIsFormModalOpen]   = useState(false)
@@ -95,6 +109,7 @@ export default function VehicleDetail() {
     { id: 'info'        as DetailTab, label: 'Informations'          },
     { id: 'maintenance' as DetailTab, label: 'Cycles de maintenance' },
     { id: 'finance'     as DetailTab, label: 'Contrat & Financement' },
+    { id: 'mouvements'  as DetailTab, label: 'Historique des mouvements' },
   ]
 
   // Vérifie si au moins un champ carte grise est renseigné
@@ -134,8 +149,25 @@ export default function VehicleDetail() {
                 <h1 className="text-xl font-bold text-white">
                   {vehicle.brand} {vehicle.model}
                 </h1>
-                <VehicleCategoryBadge category={vehicle.category} />
+                <VehicleCategoryBadge category={vehicle.categoryId} />
                 <VehicleStatusBadge   status={vehicle.status}   />
+                {/* Toggle véhicule relais */}
+                <button
+                  onClick={() =>
+                    relaisService.toggleRelais(vehicle.id).then((res) => {
+                      if (res?.data) updateVehicle(vehicle.id, res.data)
+                    })
+                  }
+                  title={vehicle.isRelais ? "Désactiver véhicule relais" : "Définir comme véhicule relais"}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                    vehicle.isRelais
+                      ? "bg-emerald-500/20 border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/30"
+                      : "bg-white/10 border-white/20 text-white/60 hover:bg-white/20"
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  {vehicle.isRelais ? "Relais actif" : "Définir relais"}
+                </button>
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-violet-300 text-xs font-mono font-semibold">{vehicle.registration}</span>
@@ -342,6 +374,18 @@ export default function VehicleDetail() {
             </div>
             <div className="p-5">
               <VehicleFinanceTab vehicle={vehicle} />
+            </div>
+          </>
+        )}
+
+        {activeTab === 'mouvements' && (
+          <>
+            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+              <div className="w-1 h-4 rounded-full bg-violet-600" />
+              <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Historique des mouvements</span>
+            </div>
+            <div className="p-5">
+              <VehicleSubstitutionTab vehicleId={vehicle.id} />
             </div>
           </>
         )}

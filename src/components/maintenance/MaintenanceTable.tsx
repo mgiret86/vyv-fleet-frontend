@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { MessageSquare, Wrench, Edit, Trash2 } from 'lucide-react'
+import { MessageSquare, Wrench, Edit, Trash2, TrendingDown } from 'lucide-react'
 import MaintenanceTypeBadge from './MaintenanceTypeBadge'
 import type { MaintenanceRecord } from '@/types'
+import { useAmortizationStore } from '@/store/amortizationStore'
 
 // ── Config statuts ─────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -49,6 +50,7 @@ interface MaintenanceTableProps {
 }
 
 export default function MaintenanceTable({ filtered, onEdit, onDelete }: MaintenanceTableProps) {
+  const amortizations = useAmortizationStore((s) => s.amortizations)
   if (filtered.length === 0) {
     return (
       <div className="py-16 text-center">
@@ -107,6 +109,9 @@ export default function MaintenanceTable({ filtered, onEdit, onDelete }: Mainten
               costDiff < 0     ? 'text-green-600 font-bold' :
                                  'text-gray-700'
 
+            const linkedAmort = amortizations.find(
+              (a) => a.source === 'MAINTENANCE' && a.sourceId === m.id
+            )
             return (
               <tr key={m.id} className="hover:bg-violet-50/20 transition-colors group">
 
@@ -178,21 +183,38 @@ export default function MaintenanceTable({ filtered, onEdit, onDelete }: Mainten
                   </span>
                 </td>
 
-                {/* Notes tooltip */}
+                {/* Notes + Amortissement */}
                 <td className="px-4 py-3 text-center">
-                  {m.notes ? (
-                    <div className="relative group/note inline-block">
-                      <div className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-violet-100 flex items-center justify-center cursor-default transition-colors">
-                        <MessageSquare className="w-3.5 h-3.5 text-gray-400 group-hover/note:text-violet-500 transition-colors" />
+                  <div className="flex items-center justify-center gap-1.5">
+                    {m.notes ? (
+                      <div className="relative group/note inline-block">
+                        <div className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-violet-100 flex items-center justify-center cursor-default transition-colors">
+                          <MessageSquare className="w-3.5 h-3.5 text-gray-400 group-hover/note:text-violet-500 transition-colors" />
+                        </div>
+                        <div className="hidden group-hover/note:block absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-xl whitespace-nowrap max-w-56 shadow-xl pointer-events-none leading-relaxed">
+                          {m.notes}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                        </div>
                       </div>
-                      <div className="hidden group-hover/note:block absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-xl whitespace-nowrap max-w-56 shadow-xl pointer-events-none leading-relaxed">
-                        {m.notes}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                    ) : (
+                      <span className="text-gray-200">—</span>
+                    )}
+                    {linkedAmort && (
+                      <div className="relative group/amort inline-block">
+                        <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center cursor-default">
+                          <TrendingDown className="w-3.5 h-3.5 text-violet-600" />
+                        </div>
+                        <div className="hidden group-hover/amort:block absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-violet-900 text-white text-xs rounded-xl shadow-xl pointer-events-none leading-relaxed whitespace-nowrap">
+                          <p className="font-bold mb-1">Amortissement lié</p>
+                          <p>Réf. : {linkedAmort.reference}</p>
+                          <p>Montant : {linkedAmort.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
+                          <p>Durée : {linkedAmort.durationMonths} mois</p>
+                          <p>Dotation : {(linkedAmort.amount / linkedAmort.durationMonths).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} / mois</p>
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-violet-900" />
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <span className="text-gray-200">—</span>
-                  )}
+                    )}
+                  </div>
                 </td>
 
                 {/* Actions */}

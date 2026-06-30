@@ -1,17 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Pencil, Trash2, X, Plus } from 'lucide-react'
+import { Pencil, Trash2, X, Plus, Shield } from 'lucide-react'
 import { roleService, type ApiRole } from '@/lib/services'
 
-export type AppModule = 'dashboard' | 'vehicles' | 'maintenance' | 'compliance' | 'incidents' | 'drivers' | 'fuel' | 'equipment' | 'settings'
+export type AppModule = 'dashboard' | 'vehicles' | 'maintenance' | 'compliance' | 'incidents' | 'drivers' | 'fuel' | 'equipment' | 'finance' | 'substitutions' | 'relais' | 'settings'
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete'
 
-const APP_MODULES: AppModule[] = ['dashboard','vehicles','maintenance','compliance','incidents','drivers','fuel','equipment','settings']
+const APP_MODULES: AppModule[] = ['dashboard','vehicles','maintenance','compliance','incidents','drivers','fuel','equipment','finance','substitutions','relais','settings']
 const APP_ACTIONS: PermissionAction[] = ['view','create','edit','delete']
 
 const MODULE_LABELS: Record<AppModule, string> = {
   dashboard: 'Tableau de bord', vehicles: 'Véhicules', maintenance: 'Maintenance',
   compliance: 'Conformité', incidents: 'Incidents', drivers: 'Conducteurs',
-  fuel: 'Carburant', equipment: 'Équipements', settings: 'Paramètres',
+  fuel: 'Carburant', equipment: 'Équipements', finance: 'Finance', relais:       'Véhicules Relais',
+  substitutions: 'Mouvements', settings: 'Paramètres',
 }
 const ACTION_LABELS: Record<PermissionAction, string> = {
   view: 'Voir', create: 'Créer', edit: 'Modifier', delete: 'Supprimer',
@@ -199,30 +200,39 @@ export default function SettingsRoles() {
       )}
 
       {isDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-auto">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-semibold text-gray-900">
-                {editingRole ? `Modifier : ${editingRole.name}` : 'Nouveau rôle'}
-              </h2>
-              <button onClick={() => setIsDialogOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-2xl max-h-[65vh] flex flex-col overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50/50 flex-shrink-0">
+              <div className="w-1 h-5 rounded-full bg-violet-600" />
+              <Shield className="w-4 h-4 text-violet-500" />
+              <div className="flex-1">
+                <h2 className="text-sm font-bold text-gray-900">
+                  {editingRole ? `Modifier : ${editingRole.name}` : 'Nouveau rôle'}
+                </h2>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400 mt-0.5">
+                  {editingRole ? 'Modifiez les permissions ci-dessous' : 'Définissez les droits d\'accès du rôle'}
+                </p>
+              </div>
+              <button onClick={() => setIsDialogOpen(false)} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
+            <div className="p-3 space-y-3 flex-1 overflow-y-auto min-h-0">
               {formError && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{formError}</div>}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
                 <input value={roleName} onChange={(e) => setRoleName(e.target.value)} disabled={editingRole?.isSystem}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 disabled:bg-gray-50" />
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 transition focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-400" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <input value={roleDescription} onChange={(e) => setRoleDescription(e.target.value)} disabled={editingRole?.isSystem}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-violet-500 focus:border-violet-500 disabled:bg-gray-50" />
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 transition focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-400" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Couleur</label>
                 <select value={roleColor} onChange={(e) => setRoleColor(e.target.value)} disabled={editingRole?.isSystem}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-violet-500 disabled:bg-gray-50">
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 transition focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400">
                   {Object.keys(ROLE_COLORS).map((k) => <option key={k} value={k}>{k}</option>)}
                 </select>
               </div>
@@ -233,23 +243,23 @@ export default function SettingsRoles() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Module</th>
-                        {APP_ACTIONS.map((a) => <th key={a} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">{ACTION_LABELS[a]}</th>)}
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Tout</th>
+                        {APP_ACTIONS.map((a) => <th key={a} className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 uppercase">{ACTION_LABELS[a]}</th>)}
+                        <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-500 uppercase">Tout</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {APP_MODULES.map((module) => (
                         <tr key={module}>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{MODULE_LABELS[module]}</td>
+                          <td className="px-3 py-1.5 text-sm font-medium text-gray-900">{MODULE_LABELS[module]}</td>
                           {APP_ACTIONS.map((action) => (
-                            <td key={action} className="px-4 py-3 text-center">
+                            <td key={action} className="px-3 py-1.5 text-center">
                               <input type="checkbox" checked={permissions[module]?.[action] ?? false}
                                 onChange={(e) => handlePermChange(module, action, e.target.checked)}
                                 disabled={editingRole?.isSystem}
                                 className="h-4 w-4 accent-violet-600 disabled:opacity-50" />
                             </td>
                           ))}
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-3 py-1.5 text-center">
                             <input type="checkbox"
                               checked={APP_ACTIONS.every((a) => permissions[module]?.[a])}
                               onChange={(e) => handleToggleModule(module, e.target.checked)}
@@ -263,15 +273,20 @@ export default function SettingsRoles() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t">
-              <button onClick={() => setIsDialogOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">
-                Annuler
-              </button>
-              <button onClick={handleSave} disabled={saving || editingRole?.isSystem}
-                className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-md hover:bg-violet-700 disabled:opacity-50">
-                {saving ? 'Enregistrement...' : editingRole ? 'Sauvegarder' : 'Créer'}
-              </button>
+            <div className="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+              <p className="text-[10px] text-gray-400">
+                <span className="text-red-500">*</span> Champs obligatoires
+              </p>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setIsDialogOpen(false)}
+                  className="px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                  Annuler
+                </button>
+                <button type="button" onClick={handleSave} disabled={saving || editingRole?.isSystem}
+                  className="px-4 py-2 text-sm font-bold text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50">
+                  {saving ? 'Enregistrement...' : editingRole ? 'Sauvegarder' : 'Créer'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

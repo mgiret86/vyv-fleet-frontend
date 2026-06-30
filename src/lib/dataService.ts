@@ -16,7 +16,7 @@ import { MOCK_ROLES, MOCK_SETTINGS_USERS,
          MOCK_SETTINGS_AGENCIES }                 from '@/data/mockSettings'
 
 // ─── Flag environnement ────────────────────────────────────────────────────────
-const USE_MOCK = true
+const USE_MOCK = false
 
 // ─── Helper latence simulée ────────────────────────────────────────────────────
 function fakeFetch<T>(data: T): Promise<T> {
@@ -120,7 +120,17 @@ export const vehicleService = {
 
       return fakeFetch(merged)
     }
-    return put<Vehicle>(`/vehicles/${id}`, data)
+    const ALLOWED_KEYS = [
+      'registration', 'brand', 'model', 'categoryId', 'energy', 'agencyId',
+      'mileage', 'monthlyLeaseCost', 'arsApprovalExpiry', 'insuranceExpiry',
+      'technicalInspectionExpiry', 'nextMaintenanceDate', 'firstRegistrationDate',
+      'entryDate', 'exitDate', 'taxiMeterControlExpiry', 'color', 'vin',
+      'nationalGenre', 'co2Emission', 'seatingCapacity', 'imeiPda', 'imeiTelematics',
+    ]
+    const payload = Object.fromEntries(
+      Object.entries(data).filter(([k]) => ALLOWED_KEYS.includes(k as never))
+    )
+    return put<Vehicle>(`/vehicles/${id}`, payload)
   },
 
   /**
@@ -219,6 +229,22 @@ export interface DashboardStats {
   maintenancesThisWeek: number
 }
 
+export interface AgencyStat {
+  agencyId:         string
+  agencyName:       string
+  total:            number
+  active:           number
+  availabilityRate: number
+  complianceScore:  number
+}
+
+export interface CostTrendEntry {
+  month:       string
+  fuel:        number
+  maintenance: number
+  total:       number
+}
+
 export const dashboardService = {
   stats: (agencyId?: string): Promise<DashboardStats> => {
     if (USE_MOCK) return fakeFetch(mockStats as unknown as DashboardStats)
@@ -231,6 +257,14 @@ export const dashboardService = {
   maintenances: (agencyId?: string): Promise<MaintenanceRecord[]> => {
     if (USE_MOCK) return fakeFetch(MOCK_DASHBOARD_MAINTENANCES as unknown as MaintenanceRecord[])
     return get<MaintenanceRecord[]>('/dashboard/maintenances', agencyId ? { agencyId } : undefined)
+  },
+  agencyStats: (agencyId?: string): Promise<AgencyStat[]> => {
+    if (USE_MOCK) return fakeFetch([] as AgencyStat[])
+    return get<AgencyStat[]>('/dashboard/agency-stats', agencyId ? { agencyId } : undefined)
+  },
+  costTrend: (agencyId?: string): Promise<CostTrendEntry[]> => {
+    if (USE_MOCK) return fakeFetch([] as CostTrendEntry[])
+    return get<CostTrendEntry[]>('/dashboard/cost-trend', agencyId ? { agencyId } : undefined)
   },
 }
 
@@ -302,9 +336,13 @@ const toIso = (v: string | null | undefined): string | null =>
 
 const buildDriverPayload = (d: any) => ({
   ...d,
-  licenseExpiry:     toIso(d.licenseExpiry),
-  medicalExamDate:   toIso(d.medicalExamDate),
-  medicalExamExpiry: toIso(d.medicalExamExpiry),
+  licenseExpiry:            toIso(d.licenseExpiry),
+  deaExpiry:                toIso(d.deaExpiry),
+  fspExpiry:                toIso(d.fspExpiry),
+  medicalCertificateExpiry: toIso(d.medicalCertificateExpiry),
+  medicalExamDate:          toIso(d.medicalExamDate),
+  medicalExamExpiry:        toIso(d.medicalExamExpiry),
+  nextTrainingDate:         toIso(d.nextTrainingDate),
 })
 
 export const driverService = {
@@ -396,7 +434,29 @@ export const fuelService = {
   },
 }
 
+
 // ══════════════════════════════════════════════════════════════════════════════
+// TCO
+// ══════════════════════════════════════════════════════════════════════════════
+export const tcoService = {
+  list: (agencyId?: string, categoryId?: string): Promise<any[]> => {
+    const params = new URLSearchParams()
+    if (agencyId)  params.set('agencyId',  agencyId)
+    if (categoryId) params.set('categoryId', categoryId)
+    const qs = params.toString()
+    return get<any[]>(qs ? `/tco?${qs}` : '/tco')
+  },
+  getByVehicle: (vehicleId: string): Promise<any> => {
+    return get<any>(`/tco/${vehicleId}`)
+  },
+  compute: (vehicleId: string): Promise<any> => {
+    return post<any>(`/tco/compute/${vehicleId}`, {})
+  },
+  update: (vehicleId: string, data: any) => {
+    return put<any>(`/tco/${vehicleId}`, data)
+  },
+}
+
 // INCIDENTS
 // ══════════════════════════════════════════════════════════════════════════════
 const mapIncident = (i: any) => ({
@@ -574,3 +634,79 @@ export const settingsService = {
     return data.data as { logoUrl: string }
   },
 }
+
+// ── Substitutions ──────────────────────────────────────────────────────────────
+export const substitutionService = {
+  list:   (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
+    return get<any[]>(`/substitutions${qs}`)
+  },
+  get:    (id: string)                => get<any>(`/substitutions/${id}`),
+  create: (data: unknown)             => post<any>('/substitutions', data),
+  update: (id: string, data: unknown) => put<any>(`/substitutions/${id}`, data),
+  remove: (id: string)                => del<void>(`/substitutions/${id}`),
+}
+
+// ─────────────────────────────────────────────────────────────────
+// RELAIS SERVICE
+// ─────────────────────────────────────────────────────────────────
+import type { RelaisDepot, RelaisMission, RelaisKPIs } from '@/types'
+
+export const relaisService = {
+  // Véhicules relais
+  listVehicles: () =>
+    api.get<ApiResponse<Array<import("@/types").Vehicle & {
+      agency: { id: string; name: string };
+      relaisDepot: RelaisDepot | null;
+      relaisMissions: RelaisMission[];
+    }>>>('relais/vehicles'),
+
+  toggleRelais: (vehicleId: string) =>
+    api.put<import("@/types").Vehicle>(`relais/vehicles/${vehicleId}/toggle`, {}),
+
+  // Dépôts
+  listDepots: () =>
+    api.get<ApiResponse<RelaisDepot[]>>('relais/depots'),
+
+  createDepot: (data: Partial<RelaisDepot>) =>
+    api.post<ApiResponse<RelaisDepot>>('relais/depots', data),
+
+  updateDepot: (id: string, data: Partial<RelaisDepot>) =>
+    api.put<ApiResponse<RelaisDepot>>(`relais/depots/${id}`, data),
+
+  deleteDepot: (id: string) =>
+    api.delete(`relais/depots/${id}`),
+
+
+  assignVehicle: (depotId: string, vehicleId: string) =>
+    api.put<ApiResponse<import('@/types').Vehicle>>(`relais/depots/${depotId}/vehicles/${vehicleId}`, {}),
+
+  unassignVehicle: (depotId: string, vehicleId: string) =>
+    api.delete<ApiResponse<import('@/types').Vehicle>>(`relais/depots/${depotId}/vehicles/${vehicleId}`),
+  // Missions
+  listMissions: (params?: { status?: string; relaisVehicleId?: string; replacedVehicleId?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status)            q.set('status',            params.status)
+    if (params?.relaisVehicleId)   q.set('relaisVehicleId',   params.relaisVehicleId)
+    if (params?.replacedVehicleId) q.set('replacedVehicleId', params.replacedVehicleId)
+    const qs = q.toString()
+    return api.get<ApiResponse<RelaisMission[]>>(qs ? `relais/missions?${qs}` : 'relais/missions')
+  },
+
+  getMission: (id: string) =>
+    api.get<ApiResponse<RelaisMission>>(`relais/missions/${id}`),
+
+  createMission: (data: Partial<RelaisMission>) =>
+    api.post<ApiResponse<RelaisMission>>('relais/missions', data),
+
+  updateMission: (id: string, data: Partial<RelaisMission>) =>
+    api.put<ApiResponse<RelaisMission>>(`relais/missions/${id}`, data),
+
+  deleteMission: (id: string) =>
+    api.delete(`relais/missions/${id}`),
+
+  // KPIs
+  getKPIs: () =>
+    api.get<ApiResponse<RelaisKPIs>>('relais/kpis'),
+}
+

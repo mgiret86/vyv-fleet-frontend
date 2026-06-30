@@ -73,7 +73,7 @@ function AssignModal({ vehicle, assignedTemplateIds, onAssign, onClose }: {
 
   const available = templates.filter((t) =>
     !assignedTemplateIds.has(t.id) &&
-    (t.applicableCategories.length === 0 || t.applicableCategories.includes(vehicle.category))
+    (t.applicableCategories.length === 0 || t.applicableCategories.includes(vehicle.categoryId))
   )
   const selectedTemplate = templates.find((t) => t.id === selectedId)
 

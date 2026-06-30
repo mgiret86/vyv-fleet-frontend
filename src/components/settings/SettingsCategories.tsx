@@ -228,7 +228,7 @@ function DeactivateConfirmModal({
 
 // ─── Composant principal ──────────────────────────────────────────
 export default function SettingsCategories() {
-  const { categories, fetchCategories, deactivateCategory, getActive } = useVehicleCategoryStore()
+  const { categories, fetchCategories, deleteCategory, getActive } = useVehicleCategoryStore()
   const { vehicles } = useVehicleStore()
 
   const [isFormOpen,    setIsFormOpen]    = useState(false)
@@ -250,12 +250,12 @@ export default function SettingsCategories() {
 
   function handleDeactivateConfirm() {
     if (!deactivating) return
-    deactivateCategory(deactivating.id)
+    deleteCategory(deactivating.id)
     setDeactivating(null)
   }
 
   function getVehicleCount(categoryId: string): number {
-    return vehicles.filter((v) => v.category === categoryId).length
+    return vehicles.filter((v) => v.categoryId === categoryId).length
   }
 
   return (

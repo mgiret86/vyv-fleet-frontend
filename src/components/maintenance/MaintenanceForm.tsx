@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, TrendingDown } from 'lucide-react'
 import { useVehicleStore } from '@/store/vehicleStore'
+import { useAmortizationStore } from '@/store/amortizationStore'
 import type { MaintenanceRecord } from '@/types'
 
 interface MaintenanceFormProps {
   isOpen:       boolean
   onClose:      () => void
   maintenance?: MaintenanceRecord
-  onSave:       (m: MaintenanceRecord) => void
+  onSave:       (m: MaintenanceRecord, amort?: { amount: number; durationMonths: number; reference: string }) => void
 }
 
 interface FormErrors {
@@ -37,10 +38,14 @@ function toDateInputValue(dateStr?: string | null): string {
 }
 
 export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }: MaintenanceFormProps) {
-  const vehicles   = useVehicleStore((s) => s.vehicles)
+  const vehicles      = useVehicleStore((s) => s.vehicles)
+  const amortizations = useAmortizationStore((s) => s.amortizations)
   const toISO = (d: string | null | undefined): string | null =>
     d ? (d.includes('T') ? d : d + 'T00:00:00.000Z') : null
-  const isEditMode = Boolean(maintenance)
+  const isEditMode    = Boolean(maintenance)
+  const existingAmort = isEditMode
+    ? amortizations.find((a) => a.source === 'MAINTENANCE' && a.sourceId === maintenance!.id)
+    : undefined
 
   const [vehicleId,            setVehicleId]            = useState<string>('')
   const [type,                 setType]                 = useState<MaintenanceRecord['type']>('PREVENTIVE')
@@ -54,6 +59,12 @@ export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }
   const [mileageAtMaintenance, setMileageAtMaintenance] = useState<string>('')
   const [notes,                setNotes]                = useState<string>('')
   const [errors,               setErrors]               = useState<FormErrors>({})
+
+  // Amortissement
+  const [enableAmort,    setEnableAmort]    = useState(false)
+  const [amortAmount,    setAmortAmount]    = useState<string>('')
+  const [amortDuration,  setAmortDuration]  = useState<string>('12')
+  const [amortReference, setAmortReference] = useState<string>('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -69,6 +80,10 @@ export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }
     setMileageAtMaintenance(maintenance?.mileageAtMaintenance != null ? String(maintenance.mileageAtMaintenance) : '')
     setNotes(maintenance?.notes ?? '')
     setErrors({})
+    setEnableAmort(false)
+    setAmortAmount('')
+    setAmortDuration('12')
+    setAmortReference('')
   }, [maintenance, isOpen])
 
   function validate(): boolean {
@@ -108,7 +123,11 @@ export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }
       notes:                notes.trim() || null,
     }
 
-    onSave(record)
+    const amortData = enableAmort && amortAmount !== "" && amortReference.trim() !== ""
+      ? { amount: parseFloat(amortAmount), durationMonths: parseInt(amortDuration, 10) || 12, reference: amortReference.trim() }
+      : undefined
+
+    onSave(record, amortData)
   }
 
   if (!isOpen) return null
@@ -215,9 +234,90 @@ export default function MaintenanceForm({ isOpen, onClose, maintenance, onSave }
           {status === 'COMPLETED' && (
             <div>
               <label htmlFor="realCost" className="block text-sm font-medium text-gray-700 mb-1">Coût réel (€)</label>
-              <input id="realCost" type="number" min={0} step={0.01} value={realCost} onChange={(e) => setRealCost(e.target.value)}
+              <input id="realCost" type="number" min={0} step={0.01} value={realCost} onChange={(e) => { setRealCost(e.target.value); if (enableAmort || amortAmount === '') setAmortAmount(e.target.value) }}
                 placeholder="0.00" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
             </div>
+          )}
+
+          {/* Amortissement */}
+          {status === 'COMPLETED' && realCost !== '' && (
+            existingAmort ? (
+              <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingDown className="w-4 h-4 text-violet-600" />
+                  <span className="text-sm font-semibold text-violet-800">Amortissement lié à cette intervention</span>
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Référence</span>
+                    <span className="font-semibold text-gray-800">{existingAmort.reference}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Montant</span>
+                    <span className="font-semibold text-gray-800">{existingAmort.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Durée</span>
+                    <span className="font-semibold text-gray-800">{existingAmort.durationMonths} mois</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Dotation / mois</span>
+                    <span className="font-bold text-violet-700">{(existingAmort.amount / existingAmort.durationMonths).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Statut</span>
+                    <span className={`font-semibold ${existingAmort.status === 'ACTIVE' ? 'text-green-600' : 'text-gray-400'}`}>
+                      {existingAmort.status === 'ACTIVE' ? 'Actif' : 'Clôturé'}
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-3 text-[10px] text-violet-500 italic">Un amortissement est déjà enregistré pour cette intervention. Pour le modifier, rendez-vous dans la page Finance.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 space-y-3">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input type="checkbox" checked={enableAmort}
+                    onChange={(e) => { setEnableAmort(e.target.checked); if (e.target.checked && amortAmount === '') setAmortAmount(realCost) }}
+                    className="w-4 h-4 rounded border-gray-300 accent-violet-600" />
+                  <TrendingDown className="w-4 h-4 text-violet-600" />
+                  <span className="text-sm font-semibold text-violet-800">Passer tout ou partie en amortissement</span>
+                </label>
+                {enableAmort && (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="amortAmount" className="block text-xs font-medium text-gray-600 mb-1">Montant à amortir (€) <span className="text-red-500">*</span></label>
+                        <input id="amortAmount" type="number" min={0.01} step={0.01}
+                          value={amortAmount} onChange={(e) => setAmortAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+                        {realCost !== '' && amortAmount !== '' && parseFloat(amortAmount) > parseFloat(realCost) && (
+                          <p className="mt-1 text-xs text-red-500">Ne peut pas dépasser le coût réel ({realCost} €)</p>
+                        )}
+                      </div>
+                      <div>
+                        <label htmlFor="amortDuration" className="block text-xs font-medium text-gray-600 mb-1">Durée (mois) <span className="text-red-500">*</span></label>
+                        <input id="amortDuration" type="number" min={1} max={120} step={1}
+                          value={amortDuration} onChange={(e) => setAmortDuration(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="amortReference" className="block text-xs font-medium text-gray-600 mb-1">Référence comptable <span className="text-red-500">*</span></label>
+                      <input id="amortReference" type="text"
+                        value={amortReference} onChange={(e) => setAmortReference(e.target.value)}
+                        placeholder="Ex: AMORT-2026-001"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" />
+                    </div>
+                    {amortAmount !== '' && amortDuration !== '' && parseFloat(amortAmount) > 0 && parseInt(amortDuration) > 0 && (
+                      <p className="text-xs text-violet-700 bg-violet-100 rounded-lg px-3 py-2">
+                        Dotation mensuelle : <strong>{(parseFloat(amortAmount) / parseInt(amortDuration)).toFixed(2)} €</strong> sur {amortDuration} mois
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
           )}
 
           {/* Notes */}

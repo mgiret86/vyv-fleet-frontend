@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Truck, Bell, Wrench, HeartPulse,
   AlertTriangle, Fuel, FileText, Building2, ChevronLeft,
-  ChevronRight, Activity, Shield, Euro,
+  ChevronRight, Activity, Shield, Euro, RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/useAppStore'
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { to: '/fuel',        icon: Fuel,            label: 'Carburant'            },
   { to: '/fines',       icon: FileText,        label: 'Infractions'          },
   { to: '/agencies',    icon: Building2,       label: 'Agences'              },
+  { to: '/relais',      icon: RefreshCw,       label: 'Vehicules Relais'     },
 ]
 
 export default function Sidebar() {

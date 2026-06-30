@@ -1,10 +1,7 @@
-import { create }  from 'zustand'
-import { persist } from 'zustand/middleware'
+import { create } from 'zustand'
 import type { VehicleCategory } from '@/types'
-import { MOCK_CATEGORIES }      from '@/data/mockCategories'
-import { useVehicleStore }      from '@/store/vehicleStore'
+import { get as apiGet, post, put, del } from '@/lib/api'
 
-// ─── Palette de couleurs disponibles ──────────────────────────────
 export const CATEGORY_COLORS = [
   { key: 'violet', label: 'Violet', bg: 'bg-violet-100', text: 'text-violet-700', dot: 'bg-violet-500' },
   { key: 'blue',   label: 'Bleu',   bg: 'bg-blue-100',   text: 'text-blue-700',   dot: 'bg-blue-500'   },
@@ -19,21 +16,19 @@ export const CATEGORY_COLORS = [
 
 export type CategoryColorKey = typeof CATEGORY_COLORS[number]['key']
 
-// ─── Helper : génère un code slug depuis un label ─────────────────
-function toCode(label: string): string {
+export function getCategoryColor(colorKey: string) {
+  return CATEGORY_COLORS.find((c) => c.key === colorKey) ?? CATEGORY_COLORS[8]
+}
+
+// Génère le slug name depuis le label (identique à l'ancien toCode)
+function toName(label: string): string {
   return label
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // retire accents
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
 }
 
-// ─── Helper : récupère la config couleur ─────────────────────────
-export function getCategoryColor(colorKey: string) {
-  return CATEGORY_COLORS.find((c) => c.key === colorKey) ?? CATEGORY_COLORS[8] // fallback gray
-}
-
-// ─── Types store ──────────────────────────────────────────────────
 export interface CategoryFormData {
   label:   string
   color:   string
@@ -42,83 +37,65 @@ export interface CategoryFormData {
 }
 
 interface VehicleCategoryState {
-  categories:       VehicleCategory[]
-  fetchCategories:  () => void
-  addCategory:      (data: CategoryFormData) => void
-  updateCategory:   (id: string, data: CategoryFormData) => void
-  deactivateCategory: (id: string) => void   // réaffecte les véhicules → Hors liste
-  getById:          (id: string) => VehicleCategory | undefined
-  getActive:        () => VehicleCategory[]
+  categories:      VehicleCategory[]
+  loading:         boolean
+  error:           string | null
+  fetchCategories: () => Promise<void>
+  addCategory:     (data: CategoryFormData) => Promise<void>
+  updateCategory:  (id: string, data: CategoryFormData) => Promise<void>
+  deleteCategory:  (id: string) => Promise<void>
+  getById:         (id: string) => VehicleCategory | undefined
+  getActive:       () => VehicleCategory[]
 }
 
-// ─── Store ────────────────────────────────────────────────────────
-export const useVehicleCategoryStore = create<VehicleCategoryState>()(
-  persist(
-    (set, get) => ({
-      categories: MOCK_CATEGORIES,
+export const useVehicleCategoryStore = create<VehicleCategoryState>()((set, get) => ({
+  categories: [],
+  loading:    false,
+  error:      null,
 
-      fetchCategories: () => {
-        // Garantit que la catégorie système existe toujours
-        set((s) => {
-          const hasSystem = s.categories.some((c) => c.isSystem)
-          if (hasSystem) return s
-          return { categories: [...s.categories, ...MOCK_CATEGORIES] }
-        })
-      },
+  fetchCategories: async () => {
+    set({ loading: true, error: null })
+    try {
+      const data = await apiGet<VehicleCategory[]>('/vehicle-categories')
+      set({ categories: data })
+    } catch (e) {
+      set({ error: (e as Error).message })
+    } finally {
+      set({ loading: false })
+    }
+  },
 
-      addCategory: (data) => {
-        const now = new Date().toISOString()
-        const newCat: VehicleCategory = {
-          id:        `cat-${Date.now()}`,
-          label:     data.label.trim(),
-          code:      toCode(data.label),
-          color:     data.color,
-          vatRate:   data.vatRate,
-          isActive:  true,
-          isSystem:  false,
-          order:     data.order,
-          createdAt: now,
-          updatedAt: now,
-        }
-        set((s) => ({ categories: [...s.categories, newCat] }))
-      },
+  addCategory: async (data) => {
+    const created = await post<VehicleCategory>('/vehicle-categories', {
+      name:    toName(data.label),
+      label:   data.label.trim(),
+      color:   data.color,
+      vatRate: data.vatRate,
+      order:   data.order,
+    })
+    set((s) => ({ categories: [...s.categories, created] }))
+  },
 
-      updateCategory: (id, data) => {
-        set((s) => ({
-          categories: s.categories.map((c) =>
-            c.id === id
-              ? { ...c, ...data, label: data.label.trim(), updatedAt: new Date().toISOString() }
-              : c
-          ),
-        }))
-      },
+  updateCategory: async (id, data) => {
+    const updated = await put<VehicleCategory>(`/vehicle-categories/${id}`, {
+      name:    toName(data.label),
+      label:   data.label.trim(),
+      color:   data.color,
+      vatRate: data.vatRate,
+      order:   data.order,
+    })
+    set((s) => ({
+      categories: s.categories.map((c) => (c.id === id ? updated : c)),
+    }))
+  },
 
-      deactivateCategory: (id) => {
-        const cat = get().categories.find((c) => c.id === id)
-        if (!cat || cat.isSystem) return
+  deleteCategory: async (id) => {
+    await del(`/vehicle-categories/${id}`)
+    set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }))
+  },
 
-        // Réaffecte les véhicules concernés → catégorie Hors liste
-        const horsListeId = get().categories.find((c) => c.isSystem)?.id ?? 'cat-hors-liste'
-        const vehicleStore = useVehicleStore.getState()
-        const impacted = vehicleStore.vehicles.filter((v) => v.category === id)
-        impacted.forEach((v) => {
-          vehicleStore.updateVehicle?.(v.id, { category: horsListeId })
-        })
-
-        set((s) => ({
-          categories: s.categories.map((c) =>
-            c.id === id
-              ? { ...c, isActive: false, updatedAt: new Date().toISOString() }
-              : c
-          ),
-        }))
-      },
-
-      getById:  (id) => get().categories.find((c) => c.id === id),
-      getActive: ()  => get().categories
-        .filter((c) => c.isActive)
-        .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
-    }),
-    { name: 'vyv-vehicle-categories' }
-  )
-)
+  getById:   (id) => get().categories.find((c) => c.id === id),
+  getActive: ()   => get().categories
+    .filter((c) => c.isActive)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.label.localeCompare(b.label)),
+}))

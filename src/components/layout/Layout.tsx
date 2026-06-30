@@ -3,11 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Truck, Wrench, ClipboardCheck, Fuel, AlertTriangle,
   Users, BriefcaseMedical, Menu, X, Settings, LogOut,
-  UserCircle, Euro, Bell, ChevronRight,
-} from 'lucide-react'
-import { useAuthStore } from '@/store/useAuthStore'
-import { useAppStore } from '@/store/useAppStore'
-import GlobalSearch from '@/components/layout/GlobalSearch'
+  UserCircle, Euro, Bell, ChevronRight, ArrowLeftRight, RefreshCw,
+} from "lucide-react"
+import { useAuthStore }    from '@/store/useAuthStore'
+import { useAppStore }     from '@/store/useAppStore'
+import { useVehicleStore }  from '@/store/vehicleStore'
+import { driverService }   from '@/lib/services'
+
+import GlobalSearch        from '@/components/layout/GlobalSearch'
 
 interface LayoutProps { children: React.ReactNode }
 
@@ -27,6 +30,8 @@ const NAV_GROUPS = [
       { name: 'Carburant',    href: '/fuel',        icon: Fuel,             module: 'fuel'        },
       { name: 'Équipements',  href: '/equipment',   icon: BriefcaseMedical, module: 'equipment'   },
       { name: 'Incidents',    href: '/incidents',   icon: AlertTriangle,    module: 'incidents'   },
+      { name: 'Mouvements',   href: '/substitutions', icon: ArrowLeftRight,  module: 'substitutions' },
+      { name: "Véhicules Relais", href: "/relais", icon: RefreshCw, module: "relais" },
     ],
   },
   {
@@ -54,7 +59,8 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   incidents:   'Incidents',
   finance:     'Finance',
   compliance:  'Conformité',
-  settings:    'Paramètres',
+  settings:       'Paramètres',
+  substitutions:  'Mouvements de parc',
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -75,6 +81,16 @@ export default function Layout({ children }: LayoutProps) {
   const { fetchAgencies } = useAppStore()
   const hasHydrated = useAuthStore((s) => s.hasHydrated)
 
+  // ─── Stores pour résolution des IDs dans le breadcrumb ────────────
+  const vehicles = useVehicleStore((s) => s.vehicles)
+  const [drivers, setDrivers] = useState<{ id: string; firstName: string; lastName: string }[]>([])
+  useEffect(() => {
+    driverService.list()
+      .then((list) => setDrivers(list))
+      .catch(() => {})
+  }, [])
+
+
   useEffect(() => { if (hasHydrated) fetchAgencies() }, [hasHydrated])
 
   const initials = currentUser
@@ -83,15 +99,36 @@ export default function Layout({ children }: LayoutProps) {
 
   const handleLogout = () => { logout(); navigate('/login') }
 
-  // Breadcrumb dynamique
-  const segments = location.pathname.split('/').filter(Boolean)
+  // ─── Résolution d'un segment d'URL en label lisible ───────────────
+  function resolveSegment(seg: string, index: number, allSegments: string[]): string {
+    // Segment connu dans le dictionnaire statique
+    if (BREADCRUMB_LABELS[seg]) return BREADCRUMB_LABELS[seg]
+
+    // Segment précédent = "vehicles" → résolution en plaque d'immatriculation
+    if (index > 0 && allSegments[index - 1] === 'vehicles') {
+      const vehicle = vehicles.find((v) => v.id === seg)
+      if (vehicle) return vehicle.registration
+    }
+
+    // Segment précédent = "drivers" → résolution en prénom + nom
+    if (index > 0 && allSegments[index - 1] === 'drivers') {
+      const driver = drivers.find((d) => d.id === seg)
+      if (driver) return `${driver.firstName} ${driver.lastName}`
+      return 'Fiche conducteur'
+    }
+
+    // Fallback
+    return seg
+  }
+
+  // ─── Breadcrumb dynamique ─────────────────────────────────────────
+  const segments  = location.pathname.split('/').filter(Boolean)
   const breadcrumb = segments.map((seg, i) => ({
-    label: BREADCRUMB_LABELS[seg] ?? seg,
+    label: resolveSegment(seg, i, segments),
     href:  '/' + segments.slice(0, i + 1).join('/'),
   }))
 
   const isItemVisible = (module: string) => {
-    if (module === 'finance') return true
     return canAccess(module as Parameters<typeof canAccess>[0])
   }
 

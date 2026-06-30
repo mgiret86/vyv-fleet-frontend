@@ -10,6 +10,9 @@ const ALL_TRUE: Permissions = {
   fuel:        { view: true, create: true, edit: true, delete: true },
   equipment:   { view: true, create: true, edit: true, delete: true },
   settings:    { view: true, create: true, edit: true, delete: true },
+  finance:     { view: true, create: true, edit: true, delete: true },
+      substitutions:  { view: true,  create: true,  edit: true,  delete: true  },
+    relais:        { view: true, create: true, edit: true, delete: true },
 }
 
 export const MOCK_ROLES: Role[] = [
@@ -37,6 +40,9 @@ export const MOCK_ROLES: Role[] = [
       fuel:        { view: true, create: true, edit: true, delete: true },
       equipment:   { view: true, create: true, edit: true, delete: true },
       settings:    { view: true, create: false, edit: false, delete: false },
+      finance:     { view: true, create: true, edit: true, delete: true },
+      substitutions:  { view: true,  create: true,  edit: true,  delete: true  },
+    relais:        { view: true, create: true, edit: true, delete: true },
     },
   },
   {
@@ -55,6 +61,9 @@ export const MOCK_ROLES: Role[] = [
       fuel:        { view: true,  create: true,  edit: true,  delete: false },
       equipment:   { view: true,  create: true,  edit: true,  delete: false },
       settings:    { view: false, create: false, edit: false, delete: false },
+      finance:     { view: true,  create: false, edit: false, delete: false },
+      substitutions:  { view: true,  create: true,  edit: true,  delete: false },
+    relais:        { view: true, create: true, edit: true, delete: false },
     },
   },
   {
@@ -73,6 +82,9 @@ export const MOCK_ROLES: Role[] = [
       fuel:        { view: true,  create: false, edit: false, delete: false },
       equipment:   { view: true,  create: false, edit: false, delete: false },
       settings:    { view: false, create: false, edit: false, delete: false },
+      finance:     { view: false, create: false, edit: false, delete: false },
+      substitutions:  { view: false, create: false, edit: false, delete: false },
+    relais:        { view: false, create: false, edit: false, delete: false },
     },
   },
 ]

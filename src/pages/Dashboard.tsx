@@ -15,15 +15,12 @@ import { useVehicleCategoryStore } from '@/store/vehicleCategoryStore'
 import {
   dashboardService,
   alertService,
+  vehicleService,
+  driverService,
+  incidentService,
 } from '@/lib/services'
-import {
-  MOCK_AGENCY_STATS,
-  MOCK_COST_TREND,
-  MOCK_EXPIRING_HABILITATIONS,
-  MOCK_OPEN_INCIDENTS,
-} from '@/data/mockDashboard'
-import { MOCK_VEHICLES } from '@/data/mockVehicles'
-import type { Alert, MaintenanceRecord } from '@/types'
+import type { Alert, MaintenanceRecord, Vehicle, Driver } from '@/types'
+import type { AgencyStat, CostTrendEntry } from '@/lib/dataService'
 
 // ── Constantes ─────────────────────────────────────────────────────
 const SEVERITY_ORDER = { CRITICAL: 0, WARNING: 1, INFO: 2 } as const
@@ -150,11 +147,19 @@ export default function Dashboard() {
 
   const [alerts,       setAlerts]       = useState<Alert[]>([])
   const [maintenances, setMaintenances] = useState<MaintenanceRecord[]>([])
+  const [vehicles,     setVehicles]     = useState<Vehicle[]>([])
+  const [drivers,      setDrivers]      = useState<Driver[]>([])
+  const [incidents,    setIncidents]    = useState<any[]>([])
+  const [agencyStats,  setAgencyStats]  = useState<AgencyStat[]>([])
+  const [costTrend,    setCostTrend]    = useState<CostTrendEntry[]>([])
   const [loading,      setLoading]      = useState(true)
   const [resolvingId,  setResolvingId]  = useState<string | null>(null)
 
+  // visibleAgencyIds vide = SUPER_ADMIN = toutes les agences visibles
   const visibleAgencies = useMemo(
-    () => agencies.filter((a) => visibleAgencyIds.includes(a.id)),
+    () => visibleAgencyIds.length === 0
+      ? agencies
+      : agencies.filter((a) => visibleAgencyIds.includes(a.id)),
     [agencies, visibleAgencyIds]
   )
   const categories = useMemo(() => getActive().filter((c) => !c.isSystem), [getActive])
@@ -165,14 +170,24 @@ export default function Dashboard() {
     setLoading(true)
     const agencyId = selectedAgencyId ?? undefined
     try {
-      const [a, m] = await Promise.all([
+      const [a, m, v, d, inc, as_, ct] = await Promise.all([
         dashboardService.alerts(agencyId),
         dashboardService.maintenances(agencyId),
+        vehicleService.list(),
+        driverService.list(),
+        incidentService.list(),
+        dashboardService.agencyStats(agencyId),
+        dashboardService.costTrend(agencyId),
       ])
       setAlerts(Array.isArray(a)
         ? (a as Alert[]).sort((x, y) => SEVERITY_ORDER[x.severity] - SEVERITY_ORDER[y.severity])
         : [])
       setMaintenances(Array.isArray(m) ? (m as MaintenanceRecord[]) : [])
+      setVehicles(Array.isArray(v) ? (v as Vehicle[]) : [])
+      setDrivers(Array.isArray(d) ? (d as Driver[]) : [])
+      setIncidents(Array.isArray(inc) ? inc : [])
+      setAgencyStats(Array.isArray(as_) ? (as_ as AgencyStat[]) : [])
+      setCostTrend(Array.isArray(ct) ? (ct as CostTrendEntry[]) : [])
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }, [selectedAgencyId])
@@ -180,28 +195,26 @@ export default function Dashboard() {
   useEffect(() => { fetchAll() }, [fetchAll])
 
   const kpiStats = useMemo(() => {
-    const vehicles = selectedAgencyId
-      ? MOCK_VEHICLES.filter((v) => v.agencyId === selectedAgencyId)
-      : MOCK_VEHICLES
-    const activeVehicles   = vehicles.filter((v) => v.status === 'ACTIVE').length
-    const totalVehicles    = vehicles.length
+    const filteredVeh      = selectedAgencyId ? vehicles.filter((v) => v.agencyId === selectedAgencyId) : vehicles
+    const activeVehicles   = filteredVeh.filter((v) => v.status === 'ACTIVE').length
+    const totalVehicles    = filteredVeh.length
     const availabilityRate = totalVehicles > 0 ? Math.round((activeVehicles / totalVehicles) * 100) : 0
     const complianceScore  = totalVehicles > 0
-      ? Math.round(vehicles.reduce((s, v) => s + (v.complianceScore ?? 0), 0) / totalVehicles) : 0
+      ? Math.round(filteredVeh.reduce((s, v) => s + (v.complianceScore ?? 0), 0) / totalVehicles) : 0
     const filteredAlerts       = selectedAgencyId ? alerts.filter((a) => a.agencyId === selectedAgencyId) : alerts
     const criticalAlerts       = filteredAlerts.filter((a) => a.severity === 'CRITICAL').length
     const warningAlerts        = filteredAlerts.filter((a) => a.severity === 'WARNING').length
     const filteredMaint        = selectedAgencyId ? maintenances.filter((m) => m.agencyId === selectedAgencyId) : maintenances
     const maintenancesThisWeek = filteredMaint.length
     return { activeVehicles, totalVehicles, availabilityRate, complianceScore, criticalAlerts, warningAlerts, maintenancesThisWeek }
-  }, [selectedAgencyId, alerts, maintenances])
+  }, [selectedAgencyId, vehicles, alerts, maintenances])
 
   const availColor  = getAvailColor(kpiStats.availabilityRate)
   const compliColor = getCompliColor(kpiStats.complianceScore)
 
-  const agencyStats = useMemo(() =>
-    selectedAgencyId ? MOCK_AGENCY_STATS.filter((a) => a.agencyId === selectedAgencyId) : MOCK_AGENCY_STATS,
-    [selectedAgencyId])
+  const filteredAgencyStats = useMemo(() =>
+    selectedAgencyId ? agencyStats.filter((a) => a.agencyId === selectedAgencyId) : agencyStats,
+    [selectedAgencyId, agencyStats])
 
   const filteredAlerts = useMemo(() =>
     selectedAgencyId ? alerts.filter((a) => a.agencyId === selectedAgencyId) : alerts,
@@ -212,27 +225,75 @@ export default function Dashboard() {
     [maintenances, selectedAgencyId])
 
   const expiringHabs = useMemo(() => {
-    if (!selectedAgencyId) return MOCK_EXPIRING_HABILITATIONS
-    const agencyName = MOCK_AGENCY_STATS.find((a) => a.agencyId === selectedAgencyId)?.agencyName
-    return MOCK_EXPIRING_HABILITATIONS.filter((h) => h.agencyName === agencyName)
-  }, [selectedAgencyId])
+    const now = Date.now()
+    const filtered = selectedAgencyId ? drivers.filter((d) => d.agencyId === selectedAgencyId) : drivers
+    const HAB_FIELDS: Array<{ key: keyof Driver; label: string }> = [
+      { key: 'licenseExpiry',           label: 'Permis de conduire' },
+      { key: 'medicalExamExpiry',       label: 'Visite médicale'   },
+      { key: 'deaExpiry',               label: 'DEA'               },
+      { key: 'fspExpiry',               label: 'FSP'               },
+      { key: 'medicalCertificateExpiry',label: 'Certificat médical'},
+    ]
+    const results: Array<{ driverId: string; driverName: string; agencyName: string; type: string; expiryDate: string; daysLeft: number; severity: 'CRITICAL' | 'WARNING' | 'INFO' }> = []
+    filtered.forEach((d) => {
+      HAB_FIELDS.forEach(({ key, label }) => {
+        const val = d[key] as string | null | undefined
+        if (!val) return
+        const daysLeft = Math.ceil((new Date(val).getTime() - now) / 86400000)
+        if (daysLeft > 60 || daysLeft < 0) return
+        results.push({
+          driverId:   d.id,
+          driverName: `${d.firstName} ${d.lastName}`,
+          agencyName: d.agencyName,
+          type:       label,
+          expiryDate: val,
+          daysLeft,
+          severity: daysLeft <= 15 ? 'CRITICAL' : daysLeft <= 30 ? 'WARNING' : 'INFO',
+        })
+      })
+    })
+    return results.sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 10)
+  }, [selectedAgencyId, drivers])
 
   const openIncidents = useMemo(() => {
-    if (!selectedAgencyId) return MOCK_OPEN_INCIDENTS
-    const agencyName = MOCK_AGENCY_STATS.find((a) => a.agencyId === selectedAgencyId)?.agencyName
-    return MOCK_OPEN_INCIDENTS.filter((i) => i.agencyName === agencyName)
-  }, [selectedAgencyId])
+    const open = incidents.filter((i) => i.status === 'OPEN' || i.status === 'IN_PROGRESS')
+    return selectedAgencyId ? open.filter((i) => i.agencyId === selectedAgencyId) : open
+  }, [selectedAgencyId, incidents])
 
   const filteredVehicles = useMemo(() =>
-    selectedAgencyId ? MOCK_VEHICLES.filter((v) => v.agencyId === selectedAgencyId) : MOCK_VEHICLES,
-    [selectedAgencyId])
+    selectedAgencyId ? vehicles.filter((v) => v.agencyId === selectedAgencyId) : vehicles,
+    [selectedAgencyId, vehicles])
+
+  const agePyramid = useMemo(() => {
+    const now = new Date()
+    const brackets = [
+      { label: '< 2 ans',    min: 0,  max: 2,        color: '#16a34a' },
+      { label: '2 – 4 ans',  min: 2,  max: 4,        color: '#65a30d' },
+      { label: '4 – 6 ans',  min: 4,  max: 6,        color: '#84cc16' },
+      { label: '6 – 8 ans',  min: 6,  max: 8,        color: '#f59e0b' },
+      { label: '8 – 10 ans', min: 8,  max: 10,       color: '#ea580c' },
+      { label: '10 – 12 ans',min: 10, max: 12,       color: '#dc2626' },
+      { label: '> 12 ans',   min: 12, max: Infinity, color: '#7f1d1d' },
+    ]
+    const total = filteredVehicles.length
+    return brackets.map(({ label, min, max, color }) => {
+      const count = filteredVehicles.filter((v) => {
+        const ref = v.firstRegistrationDate ?? v.entryDate
+        if (!ref) return min === 10  // sans date → > 10 ans par défaut
+        const years = (now.getTime() - new Date(ref).getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+        return years >= min && years < max
+      }).length
+      const pct = total > 0 ? Math.round((count / total) * 100) : 0
+      return { label, count, pct, color }
+    }).filter((b) => b.count > 0 || total === 0)
+  }, [filteredVehicles])
 
   const vehiclesByAgency = useMemo(() => {
     const map = new Map<string, Record<string, number>>()
     filteredVehicles.forEach((v) => {
       if (!map.has(v.agencyName)) map.set(v.agencyName, {})
       const entry = map.get(v.agencyName)!
-      entry[v.category] = (entry[v.category] ?? 0) + 1
+      entry[v.categoryId] = (entry[v.categoryId] ?? 0) + 1
     })
     return Array.from(map.entries()).map(([agencyName, counts]) => ({
       agencyName: agencyName.replace('VYV Ambulance ', ''),
@@ -242,9 +303,9 @@ export default function Dashboard() {
 
   const categoryTotals = useMemo(() => {
     const totals: Record<string, number> = {}
-    categories.forEach((cat) => { totals[cat.id] = filteredVehicles.filter((v) => v.category === cat.id).length })
+    categories.forEach((cat) => { totals[cat.id] = filteredVehicles.filter((v) => v.categoryId === cat.id).length })
     const horsListe = getActive().find((c) => c.isSystem)
-    if (horsListe) totals[horsListe.id] = filteredVehicles.filter((v) => v.category === horsListe.id).length
+    if (horsListe) totals[horsListe.id] = filteredVehicles.filter((v) => v.categoryId === horsListe.id).length
     return totals
   }, [filteredVehicles, categories, getActive])
 
@@ -271,20 +332,30 @@ export default function Dashboard() {
           <p className="text-violet-300 text-sm mt-0.5">Vue en temps réel de la flotte VYV Ambulance</p>
         </div>
         <div className="flex items-center gap-3">
-          {visibleAgencies.length > 1 && (
-            <label className="text-sm font-medium text-violet-300">Agence :</label>
+          {visibleAgencies.length === 0 ? (
+            <div className="h-10 w-48 rounded-xl bg-white/10 animate-pulse" />
+          ) : (
+            <>
+              {visibleAgencies.length > 1 && (
+                <label className="text-sm font-medium text-violet-300">Agence :</label>
+              )}
+              <div className="relative">
+                <select
+                  value={selectedAgencyId || ''}
+                  onChange={(e) => setSelectedAgencyId(e.target.value || null)}
+                  className="appearance-none bg-white/10 backdrop-blur border border-white/20 rounded-xl px-4 py-2.5 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer min-w-[160px]"
+                >
+                  {visibleAgencies.length > 1 && (
+                    <option value="" className="text-gray-900">Toutes les agences</option>
+                  )}
+                  {visibleAgencies.map((a) => (
+                    <option key={a.id} value={a.id} className="text-gray-900">{a.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60 pointer-events-none" />
+              </div>
+            </>
           )}
-          <div className="relative">
-            <select
-              value={selectedAgencyId || ''}
-              onChange={(e) => setSelectedAgencyId(e.target.value || null)}
-              className="appearance-none bg-white/10 backdrop-blur border border-white/20 rounded-xl px-4 py-2.5 pr-10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer"
-            >
-              {visibleAgencies.length > 1 && <option value="" className="text-gray-900">Toutes les agences</option>}
-              {visibleAgencies.map((a) => <option key={a.id} value={a.id} className="text-gray-900">{a.name}</option>)}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60 pointer-events-none" />
-          </div>
         </div>
       </div>
 
@@ -345,6 +416,56 @@ export default function Dashboard() {
             <CircularGauge value={kpiStats.availabilityRate} color={availColor}  label="Disponibilité" />
             <CircularGauge value={kpiStats.complianceScore}  color={compliColor} label="Conformité"    />
           </div>
+
+          {/* ── Pyramide des âges ── */}
+          <div className="mt-5 pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h4l2 10h6l2-10h4M3 7l2-4h14l2 4" />
+              </svg>
+              <h3 className="text-sm font-bold text-gray-700">Âge de la flotte</h3>
+            </div>
+            {agePyramid.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-2">Aucune donnée disponible</p>
+            ) : (
+              <div className="space-y-2.5">
+                {agePyramid.map(({ label, count, pct, color }) => (
+                  <div key={label}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-600">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-700">{count} véh.</span>
+                        <span className="text-[10px] text-gray-400 w-8 text-right">{pct}%</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: color }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-[10px] text-gray-400">Âge moyen estimé</span>
+                  <span className="text-xs font-bold text-violet-600">
+                    {filteredVehicles.length > 0
+                      ? (() => {
+                          const now = new Date()
+                          const withDate = filteredVehicles.filter((v) => v.firstRegistrationDate ?? v.entryDate)
+                          if (withDate.length === 0) return '—'
+                          const avg = withDate.reduce((s, v) => {
+                            const ref = v.firstRegistrationDate ?? v.entryDate
+                            return s + (now.getTime() - new Date(ref!).getTime()) / (1000 * 60 * 60 * 24 * 365.25)
+                          }, 0) / withDate.length
+                          return `${avg.toFixed(1)} ans`
+                        })()
+                      : '—'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -353,7 +474,7 @@ export default function Dashboard() {
             <h3 className="text-sm font-bold text-gray-700">Disponibilité par agence</h3>
           </div>
           <div className="space-y-4">
-            {agencyStats.map((a) => (
+            {filteredAgencyStats.map((a) => (
               <div key={a.agencyId} className="flex items-center gap-3">
                 <span className="text-xs text-gray-600 w-44 truncate">{a.agencyName}</span>
                 <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -503,7 +624,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <h3 className="text-sm font-bold text-gray-700 mb-4">Évolution des coûts (6 mois)</h3>
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={MOCK_COST_TREND} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart data={costTrend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorFuel" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.12} />
@@ -574,7 +695,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <h3 className="text-sm font-bold text-gray-700 mb-4">Conformité par agence</h3>
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={agencyStats} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
+              <BarChart data={filteredAgencyStats} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="agencyName" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} angle={-20} textAnchor="end" interval={0} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />

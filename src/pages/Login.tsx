@@ -21,8 +21,25 @@ export default function Login() {
   const [rememberMe,   setRememberMe]   = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
+  // Liste ordonnée des modules — on redirige vers le premier accessible
+  const ORDERED_ROUTES: { module: string; path: string }[] = [
+    { module: 'dashboard',   path: '/dashboard'   },
+    { module: 'vehicles',    path: '/vehicles'    },
+    { module: 'maintenance', path: '/maintenance' },
+    { module: 'compliance',  path: '/compliance'  },
+    { module: 'incidents',   path: '/incidents'   },
+    { module: 'drivers',     path: '/drivers'     },
+    { module: 'fuel',        path: '/fuel'        },
+    { module: 'equipment',   path: '/equipment'   },
+    { module: 'finance',     path: '/finance'     },
+    { module: 'settings',    path: '/settings'    },
+  ]
+
   useEffect(() => {
-    if (isAuthenticated) navigate('/dashboard', { replace: true })
+    if (!isAuthenticated) return
+    const { canAccess } = useAuthStore.getState()
+    const first = ORDERED_ROUTES.find((r) => canAccess(r.module as any))
+    navigate(first ? first.path : '/login', { replace: true })
   }, [isAuthenticated, navigate])
 
   useEffect(() => {

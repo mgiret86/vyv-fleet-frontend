@@ -6,9 +6,11 @@ import MaintenanceFilters  from '@/components/maintenance/MaintenanceFilters'
 import MaintenanceTable    from '@/components/maintenance/MaintenanceTable'
 import MaintenanceCalendar from '@/components/maintenance/MaintenanceCalendar'
 import MaintenanceForm     from '@/components/maintenance/MaintenanceForm'
+import { useAmortizationStore } from '@/store/amortizationStore'
 import TemplateList        from '@/components/maintenance/TemplateList'
 import { maintenanceService } from '@/lib/services'
 import { useVehicleStore } from '@/store/vehicleStore'
+import { useMaintenanceTemplateStore } from '@/store/maintenanceTemplateStore'
 import type { MaintenanceRecord } from '@/types'
 
 type StatusFilter = 'ALL' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
@@ -19,6 +21,7 @@ type MainTab      = 'interventions' | 'templates'
 export default function Maintenance() {
   const { filterByAgency, visibleAgencyIds } = useAgencyFilter()
   const { fetchVehicles } = useVehicleStore()
+  const { fetchTemplates } = useMaintenanceTemplateStore()
 
   const [mainTab,      setMainTab]      = useState<MainTab>('interventions')
   const [maintenances, setMaintenances] = useState<MaintenanceRecord[]>([])
@@ -47,6 +50,7 @@ export default function Maintenance() {
 
   useEffect(() => { fetchMaintenances() }, [fetchMaintenances])
   useEffect(() => { fetchVehicles() }, [])
+  useEffect(() => { fetchTemplates() }, [])
 
   const filtered = useMemo<MaintenanceRecord[]>(() => {
     let list = filterByAgency(maintenances)
@@ -100,7 +104,9 @@ export default function Maintenance() {
     } catch { setSaveError('Erreur lors de la suppression.') }
   }
 
-  const handleSave = async (m: MaintenanceRecord) => {
+  const addAmortization = useAmortizationStore((s) => s.addAmortization)
+
+  const handleSave = async (m: MaintenanceRecord, amort?: { amount: number; durationMonths: number; reference: string }) => {
     const payload = {
       vehicleId: m.vehicleId, agencyId: m.agencyId, type: m.type, label: m.label,
       description: m.description || undefined, scheduledDate: m.scheduledDate,
@@ -119,6 +125,22 @@ export default function Maintenance() {
       } else {
         const created = await maintenanceService.create(payload)
         setMaintenances((prev) => [...prev, created])
+      }
+      if (amort) {
+        try {
+          await addAmortization({
+            vehicleId:      m.vehicleId,
+            source:         'MAINTENANCE',
+            sourceId:       m.id,
+            reference:      amort.reference,
+            label:          m.label,
+            amount:         amort.amount,
+            startDate:      new Date().toISOString(),
+            durationMonths: amort.durationMonths,
+          })
+        } catch (err) {
+          console.error('Erreur creation amortissement :', err)
+        }
       }
       setIsFormOpen(false); setSaveError(null)
     } catch { setSaveError("Erreur lors de l'enregistrement.") }

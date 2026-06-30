@@ -43,7 +43,7 @@ export default function Vehicles() {
   // ── Compteurs ──────────────────────────────────────────────────
   const globalCounts = useMemo(() => {
     return categories.reduce<Record<string, number>>((acc, cat) => {
-      acc[cat.id] = vehicles.filter((v) => v.category === cat.id).length
+      acc[cat.id] = vehicles.filter((v) => v.categoryId === cat.id).length
       return acc
     }, {})
   }, [vehicles, categories])
@@ -61,7 +61,7 @@ export default function Vehicles() {
       )
     }
     return categories.reduce<Record<string, number>>((acc, cat) => {
-      acc[cat.id] = base.filter((v) => v.category === cat.id).length
+      acc[cat.id] = base.filter((v) => v.categoryId === cat.id).length
       return acc
     }, {})
   }, [vehicles, categories, agencyFilter, statusFilter, search, filterByAgency])
@@ -70,7 +70,7 @@ export default function Vehicles() {
     let filtered = filterByAgency(vehicles)
     if (agencyFilter)                filtered = filtered.filter((v) => v.agencyId === agencyFilter)
     if (statusFilter !== 'ALL')      filtered = filtered.filter((v) => v.status   === statusFilter)
-    if (selectedCategories.size > 0) filtered = filtered.filter((v) => selectedCategories.has(v.category))
+    if (selectedCategories.size > 0) filtered = filtered.filter((v) => selectedCategories.has(v.categoryId))
     if (search) {
       const q = search.toLowerCase()
       filtered = filtered.filter((v) =>

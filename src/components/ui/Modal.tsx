@@ -5,7 +5,7 @@ interface ModalProps {
   isOpen: boolean
   onClose: () => void
   title: string
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
   children: React.ReactNode
   footer?: React.ReactNode
 }
@@ -15,6 +15,7 @@ const sizeMap = {
   md: 'max-w-lg',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
+  '2xl': 'max-w-5xl',
 } as const
 
 export default function Modal({ isOpen, onClose, title, size = 'md', children, footer }: ModalProps) {
@@ -83,7 +84,7 @@ export default function Modal({ isOpen, onClose, title, size = 'md', children, f
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto max-h-[70vh] px-6 py-4">{children}</div>
+        <div className="overflow-y-auto max-h-[85vh] px-6 py-4">{children}</div>
         {footer && (
           <div className="border-t border-gray-100 px-6 py-4 flex justify-end gap-2">
             {footer}

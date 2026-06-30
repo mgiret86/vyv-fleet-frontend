@@ -4,8 +4,8 @@
 // La clé API est lue depuis le settingsStore (localStorage)
 // USE_MOCK = true → mode démo sans clé API
 // ═══════════════════════════════════════════════════════════════════
+import { useAuthStore } from '../store/useAuthStore'
 
-import { useSettingsStore } from '@/store/settingsStore'
 
 // ── Types ──────────────────────────────────────────────────────────
 export interface VehicleRegistrationData {
@@ -36,8 +36,6 @@ export interface RegistrationLookupResult {
 }
 
 // ── Configuration ──────────────────────────────────────────────────
-const RAPIDAPI_HOST = 'api-de-plaque-d-immatriculation-france.p.rapidapi.com'
-const API_URL       = `https://${RAPIDAPI_HOST}/`
 
 // ── Mock data ──────────────────────────────────────────────────────
 const MOCK_DB: Record<string, VehicleRegistrationData> = {
@@ -113,54 +111,53 @@ function mapApiResponse(json: Record<string, unknown>, plate: string): VehicleRe
     return null
   }
 
-  return {
-  registration:              plate,
-  brand:                     String(json['marque']                    ?? json['brand']            ?? ''),
-  model:                     String(json['modele']                    ?? json['model']            ?? ''),
-  version:                   json['version']           ? String(json['version'])                  : null,
-  energy:                    mapEnergy(json['energie'] ?? json['energy'] ?? json['carburant']),
-  firstRegistrationDate:     parseDate(json['date_mise_en_circulation'] ?? json['first_registration']),
-  technicalInspectionExpiry: parseDate(json['date_fin_ct']              ?? json['ct_expiry']),
-  seats:                     json['nb_places']    != null ? Number(json['nb_places'])              : null,
-  ptac:                      json['ptac']         != null ? Number(json['ptac'])                   : null,
-  co2:                       json['co2']          != null ? Number(json['co2'])                    : null,
-  nationalGenre:             json['genre_national']      ? String(json['genre_national'])          : null,
-  color:                     json['couleur']             ? String(json['couleur'])                 : null,
-  vin:                       json['vin']                 ? String(json['vin'])                     : null,
-  bodyType:                  json['carrosserie']         ? String(json['carrosserie'])             : null,
-  doors:                     json['nb_portes']    != null ? Number(json['nb_portes'])              : null,
-  power:                     json['puissance_kw'] != null ? Number(json['puissance_kw'])           : null,
-  cylinderCount:             json['nb_cylindres'] != null ? Number(json['nb_cylindres'])           : null,
-  gearbox:                   json['boite_vitesse']       ? String(json['boite_vitesse'])           : null,
-}
+  // L'API retourne les donnees dans json.data avec le prefixe AWN_
+  const d = (json['data'] ?? json) as Record<string, unknown>
 
+  return {
+    registration:              plate,
+    brand:                     String(d['AWN_marque']                    ?? d['marque']       ?? d['brand']       ?? ''),
+    model:                     String(d['AWN_modele']                    ?? d['modele']       ?? d['model']       ?? ''),
+    version:                   d['AWN_version']              ? String(d['AWN_version'])        : d['AWN_finition'] ? String(d['AWN_finition']) : null,
+    energy:                    mapEnergy(d['AWN_energie']    ?? d['AWN_energie_cg']            ?? d['energie']     ?? d['energy'] ?? d['carburant']),
+    firstRegistrationDate:     parseDate(d['AWN_date_mise_en_circulation_us'] ?? d['AWN_date_mise_en_circulation'] ?? d['date_mise_en_circulation']),
+    technicalInspectionExpiry: parseDate(d['date_fin_ct']   ?? d['ct_expiry']                 ?? null),
+    seats:                     d['AWN_nbr_de_places']  != null ? Number(d['AWN_nbr_de_places'])  : d['nb_places']    != null ? Number(d['nb_places'])    : null,
+    ptac:                      d['AWN_PTAC']           != null ? Number(d['AWN_PTAC'])           : d['ptac']         != null ? Number(d['ptac'])         : null,
+    co2:                       d['AWN_emission_co_2']  != null ? Number(d['AWN_emission_co_2'])  : d['co2']          != null ? Number(d['co2'])          : null,
+    nationalGenre:             d['AWN_genre_carte_grise']   ? String(d['AWN_genre_carte_grise']) : d['AWN_carrosserie'] ? String(d['AWN_carrosserie'])   : null,
+    color:                     d['AWN_couleur']             ? String(d['AWN_couleur'])           : d['couleur']      ? String(d['couleur'])              : null,
+    vin:                       d['AWN_VIN']                 ? String(d['AWN_VIN'])               : d['vin']          ? String(d['vin'])                  : null,
+    bodyType:                  d['AWN_style_carrosserie']   ? String(d['AWN_style_carrosserie']) : d['AWN_carrosserie'] ? String(d['AWN_carrosserie'])   : null,
+    doors:                     d['AWN_nbr_portes']     != null ? Number(d['AWN_nbr_portes'])     : d['nb_portes']    != null ? Number(d['nb_portes'])    : null,
+    power:                     d['AWN_puissance_KW']   != null ? Number(d['AWN_puissance_KW'])   : d['puissance_kw'] != null ? Number(d['puissance_kw']) : null,
+    cylinderCount:             d['AWN_nbr_cylindres']  != null ? Number(d['AWN_nbr_cylindres'])  : d['nb_cylindres'] != null ? Number(d['nb_cylindres']) : null,
+    gearbox:                   d['AWN_type_boite_vites']    ? String(d['AWN_type_boite_vites'])  : d['boite_vitesse'] ? String(d['boite_vitesse'])       : null,
+  }
 }
 
 // ── Appel API réel ─────────────────────────────────────────────────
-async function fetchFromApi(plate: string, apiKey: string): Promise<RegistrationLookupResult> {
+// Appel API via backend proxy
+async function fetchFromApi(plate: string): Promise<RegistrationLookupResult> {
   try {
-    const res = await fetch(`${API_URL}?plaque=${encodeURIComponent(plate)}`, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-key':  apiKey,
-        'x-rapidapi-host': RAPIDAPI_HOST,
-        'Content-Type':    'application/json',
-      },
+    const token = useAuthStore.getState().accessToken ?? ''
+    const res = await fetch(`/api/registration/${encodeURIComponent(plate)}`, {
+      method:  'GET',
+      headers: { 'Authorization': `Bearer ${token}` },
     })
+    if (res.status === 503) {
+      return { success: false, data: null, error: 'NO_API_KEY' }
+    }
     if (!res.ok) {
-      return { success: false, data: null, error: `Erreur API ${res.status} : ${res.statusText}` }
+      return { success: false, data: null, error: `Erreur API ${res.status}` }
     }
     const json = await res.json()
-    if (!json || typeof json !== 'object') {
-      return { success: false, data: null, error: 'Réponse API invalide' }
+    if (!json?.success) {
+      return { success: false, data: null, error: json?.error ?? 'Reponse invalide' }
     }
-    return { success: true, data: mapApiResponse(json as Record<string, unknown>, plate), error: null }
+    return { success: true, data: mapApiResponse(json.data as Record<string, unknown>, plate), error: null }
   } catch (err: unknown) {
-    return {
-      success: false,
-      data:    null,
-      error:   err instanceof Error ? err.message : 'Erreur réseau inconnue',
-    }
+    return { success: false, data: null, error: err instanceof Error ? err.message : 'Erreur reseau' }
   }
 }
 
@@ -185,20 +182,22 @@ export async function lookupRegistration(rawPlate: string): Promise<Registration
     }
   }
 
-  // Lit la clé API depuis le store (localStorage)
-  const { integrations } = useSettingsStore.getState()
-  const { key, enabled } = integrations.registrationApi
-
-  // Si clé configurée et intégration activée → appel réel
-  if (enabled && key && key.length > 10) {
-    return fetchFromApi(plate, key)
-  }
-
-  // Sinon → mode mock
-  return fetchFromMock(plate)
+  const result = await fetchFromApi(plate)
+  if (result.error === 'NO_API_KEY') return fetchFromMock(plate)
+  return result
 }
 
 // ── Test de connexion (utilisé depuis SettingsIntegrations) ────────
-export async function testRegistrationApiConnection(apiKey: string): Promise<RegistrationLookupResult> {
-  return fetchFromApi('AB-123-CD', apiKey)
+export async function testRegistrationApiConnection(): Promise<RegistrationLookupResult> {
+  try {
+    const token = useAuthStore.getState().accessToken ?? ''
+    const res = await fetch('/api/registration/test', {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+    const json = await res.json()
+    return { success: json?.success ?? false, data: null, error: json?.error ?? null }
+  } catch (err: unknown) {
+    return { success: false, data: null, error: err instanceof Error ? err.message : 'Erreur reseau' }
+  }
 }

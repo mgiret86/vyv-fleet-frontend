@@ -1,7 +1,20 @@
 import { Link } from 'react-router-dom'
-import { MOCK_TCO } from '@/data/mockFuel'
 
-type TCOEntry = (typeof MOCK_TCO)[0]
+interface TCOEntry {
+  vehicleId:           string
+  vehicleRegistration: string
+  agencyId:            string
+  agencyName:          string
+  monthlyLease:        number
+  monthlyFuel:         number
+  monthlyMaintenance:  number
+  monthlyInsurance:    number
+  monthlyOther:        number
+  totalMonthlyCost:    number
+  annualCost:          number
+  costPerKm:           number
+  mileage:             number
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────
 function getCostPerKmLevel(v: number): 'low' | 'mid' | 'high' {

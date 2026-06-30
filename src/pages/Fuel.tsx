@@ -6,30 +6,11 @@ import FuelFilters  from '@/components/fuel/FuelFilters'
 import FuelBarChart from '@/components/fuel/FuelBarChart'
 import FuelTable    from '@/components/fuel/FuelTable'
 import FuelForm     from '@/components/fuel/FuelForm'
-import TCOKPI       from '@/components/fuel/TCOKPI'
-import TCOPieChart  from '@/components/fuel/TCOPieChart'
-import TCOTable     from '@/components/fuel/TCOTable'
 import { fuelService } from '@/lib/services'
 import type { FuelEntry } from '@/types'
 
 type FuelTypeFilter = 'ALL' | 'DIESEL' | 'HYBRID' | 'ELECTRIC'
 type PeriodFilter   = 'CURRENT_MONTH' | 'PREVIOUS_MONTH' | 'LAST_3_MONTHS' | 'CURRENT_YEAR'
-
-export interface TCOEntry {
-  vehicleId:           string
-  vehicleRegistration: string
-  agencyId:            string
-  agencyName:          string
-  monthlyLease:        number
-  monthlyFuel:         number
-  monthlyMaintenance:  number
-  monthlyInsurance:    number
-  monthlyOther:        number
-  totalMonthlyCost:    number
-  annualCost:          number
-  costPerKm:           number
-  mileage:             number
-}
 
 function isWithinPeriod(dateStr: string, period: PeriodFilter): boolean {
   const date = new Date(dateStr); const now = new Date()
@@ -58,7 +39,7 @@ export default function FuelPage() {
 
   const [entries,        setEntries]        = useState<FuelEntry[]>([])
   const [loading,        setLoading]        = useState(true)
-  const [activeTab,      setActiveTab]      = useState<'fuel' | 'tco'>('fuel')
+  const [activeTab,      setActiveTab]      = useState<'fuel'>('fuel')
   const [search,         setSearch]         = useState('')
   const [fuelTypeFilter, setFuelTypeFilter] = useState<FuelTypeFilter>('ALL')
   const [agencyFilter,   setAgencyFilter]   = useState('')
@@ -68,7 +49,10 @@ export default function FuelPage() {
 
   const fetchEntries = useCallback(async () => {
     setLoading(true)
-    try { const data = await fuelService.list(); setEntries(data) }
+    try {
+      const fuel = await fuelService.list()
+      setEntries(fuel)
+    }
     catch (e) { console.error('Erreur chargement carburant :', e) }
     finally { setLoading(false) }
   }, [])
@@ -113,32 +97,6 @@ export default function FuelPage() {
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([month, cost]) => ({ month, cost }))
   }, [filteredEntries])
 
-  const tcoEntries = useMemo<TCOEntry[]>(() => {
-    const map = new Map<string, TCOEntry>()
-    visibleEntries.forEach((e) => {
-      if (!map.has(e.vehicleId)) {
-        map.set(e.vehicleId, {
-          vehicleId: e.vehicleId, vehicleRegistration: e.vehicleRegistration,
-          agencyId: e.agencyId, agencyName: e.agencyName,
-          monthlyLease: 0, monthlyFuel: 0, monthlyMaintenance: 0,
-          monthlyInsurance: 0, monthlyOther: 0, totalMonthlyCost: 0,
-          annualCost: 0, costPerKm: 0, mileage: e.mileageAtFill ?? 0,
-        })
-      }
-      const tco = map.get(e.vehicleId)!
-      tco.monthlyFuel += e.totalCost / 12
-      tco.totalMonthlyCost = tco.monthlyLease + tco.monthlyFuel + tco.monthlyMaintenance + tco.monthlyInsurance + tco.monthlyOther
-      tco.annualCost = tco.totalMonthlyCost * 12
-      tco.mileage = Math.max(tco.mileage, e.mileageAtFill ?? 0)
-      tco.costPerKm = tco.mileage > 0 ? tco.annualCost / tco.mileage : 0
-    })
-    return Array.from(map.values()).sort((a, b) => b.totalMonthlyCost - a.totalMonthlyCost)
-  }, [visibleEntries])
-
-  const tcoCost        = tcoEntries.reduce((s, t) => s + t.totalMonthlyCost, 0)
-  const tcoMaxCost     = tcoEntries.reduce((max, t) => Math.max(max, t.totalMonthlyCost), 0)
-  const tcoAvgPerKm    = tcoEntries.length ? tcoEntries.reduce((s, t) => s + t.costPerKm, 0) / tcoEntries.length : 0
-  const tcoVehicleCount = tcoEntries.length
 
   const handleSave = async (entry: FuelEntry) => {
     try {
@@ -184,7 +142,7 @@ export default function FuelPage() {
                 <Fuel className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Carburant & TCO</h1>
+                <h1 className="text-xl font-bold text-white">Carburant</h1>
                 <p className="text-violet-300 text-xs mt-0.5">
                   {loading
                     ? 'Chargement...'
@@ -213,18 +171,6 @@ export default function FuelPage() {
               </div>
             )}
 
-            {!loading && activeTab === 'tco' && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/20">
-                  <span className="text-xs font-bold text-white">{tcoVehicleCount}</span>
-                  <span className="text-[10px] text-violet-300">véhicule{tcoVehicleCount > 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/20 border border-violet-400/30">
-                  <span className="text-xs font-bold text-violet-200">{formatCurrency(tcoCost)}</span>
-                  <span className="text-[10px] text-violet-400">coût mensuel total</span>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Actions */}
@@ -258,14 +204,7 @@ export default function FuelPage() {
             fillCount={fillCount}
           />
         )}
-        {activeTab === 'tco' && (
-          <TCOKPI
-            totalCost={tcoCost}
-            avgCostPerKm={tcoAvgPerKm}
-            maxCost={tcoMaxCost}
-            vehicleCount={tcoVehicleCount}
-          />
-        )}
+
 
         {/* ── Onglets + contenu dans une carte unifiée ── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -274,7 +213,6 @@ export default function FuelPage() {
           <div className="flex border-b border-gray-100 px-2 pt-2">
             {([
               { value: 'fuel', label: 'Carburant' },
-              { value: 'tco',  label: 'TCO'       },
             ] as const).map((tab) => (
               <button
                 key={tab.value}
@@ -337,22 +275,6 @@ export default function FuelPage() {
             </>
           )}
 
-          {/* ── Onglet TCO ── */}
-          {activeTab === 'tco' && (
-            <>
-              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
-                <div className="w-1 h-4 rounded-full bg-violet-600" />
-                <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Coût total de possession</span>
-                <span className="text-xs text-gray-400 ml-auto">{tcoVehicleCount} véhicule{tcoVehicleCount !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="p-4">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  <TCOPieChart tcoEntries={tcoEntries as any} />
-                  <TCOTable    entries={tcoEntries as any} />
-                </div>
-              </div>
-            </>
-          )}
         </div>
       </div>
 

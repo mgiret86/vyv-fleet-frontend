@@ -105,14 +105,14 @@ export default function VehicleTable({ vehicles, actionColumns = [] }: VehicleTa
 
   const grouped = categories.reduce<{ id: string; label: string; color: string; vehicles: Vehicle[] }[]>(
     (acc, cat) => {
-      const group = vehicles.filter((v) => v.category === cat.id)
+      const group = vehicles.filter((v) => v.categoryId === cat.id)
       if (group.length > 0) acc.push({ id: cat.id, label: cat.label, color: cat.color, vehicles: group })
       return acc
     },
     []
   )
 
-  const orphans = vehicles.filter((v) => !knownIds.has(v.category))
+  const orphans = vehicles.filter((v) => !knownIds.has(v.categoryId))
   if (orphans.length > 0) {
     grouped.push({ id: '__orphan__', label: 'Catégorie inconnue', color: 'gray', vehicles: orphans })
   }

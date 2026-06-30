@@ -1,13 +1,45 @@
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState, useCallback } from 'react'
 import {
   Euro, TrendingUp, TrendingDown, AlertTriangle, Clock,
-  Car, BarChart3, Gauge, FileText,
+  Car, BarChart3, Gauge, FileText, RefreshCw, SlidersHorizontal,
 } from 'lucide-react'
 import { useVehicleStore }         from '@/store/vehicleStore'
 import { useVehicleContractStore } from '@/store/vehicleContractStore'
 import type { VehicleContract, VehicleContractType } from '@/types'
 import { useAmortizationStore }    from '@/store/amortizationStore'
+import type { Amortization }           from '@/types'
 import AmortizationGantt           from '@/components/amortization/AmortizationGantt'
+import AmortizationEditModal        from '@/components/amortization/AmortizationEditModal'
+import TCOKPI                       from '@/components/tco/TCOKPI'
+import TCOPieChart                  from '@/components/tco/TCOPieChart'
+import TCOTable                     from '@/components/tco/TCOTable'
+import { tcoService }               from '@/lib/services'
+import { useAppStore }              from '@/store/useAppStore'
+import { useVehicleCategoryStore }  from '@/store/vehicleCategoryStore'
+
+// ─── Type TCO ────────────────────────────────────────────────────
+interface TCOEntry {
+  vehicleId:           string
+  vehicleRegistration: string
+  agencyId:            string
+  agencyName:          string
+  monthlyLease:        number
+  monthlyFuel:         number
+  monthlyMaintenance:  number
+  monthlyInsurance:    number
+  monthlyOther:        number
+  totalMonthlyCost:    number
+  annualCost:          number
+  costPerKm:           number
+  mileage:             number
+  vehicle?: {
+    registration: string
+    brand:        string
+    model:        string
+    agency?:   { id: string; name: string }
+    category?: { id: string; name: string }
+  }
+}
 
 // ─── Config types ─────────────────────────────────────────────────
 const TYPE_CONFIG: Record<VehicleContractType, { label: string; color: string; dot: string }> = {
@@ -25,6 +57,8 @@ function getTypeCfg(type: string) {
 }
 
 const ALL_TYPES: VehicleContractType[] = ['LLD', 'LOA', 'CREDIT_BAIL', 'CREDIT_BANCAIRE', 'EN_PROPRIETE']
+
+
 
 // ─── Helpers ──────────────────────────────────────────────────────
 function formatEur(n: number): string {
@@ -166,15 +200,57 @@ export default function Finance() {
   const { vehicles }                                   = useVehicleStore()
   const { contracts, computeKmStatus, fetchContracts } = useVehicleContractStore()
   const { amortizations, fetchAmortizations }          = useAmortizationStore()
+  const [editingAmort, setEditingAmort]                = useState<Amortization | null>(null)
+  const { agencies, fetchAgencies }                    = useAppStore()
+  const { categories, fetchCategories }                = useVehicleCategoryStore()
+
+  // ── Filtres globaux ─────────────────────────────────────────────
+  const [globalAgency,   setGlobalAgency]   = useState('')
+  const [globalCategory, setGlobalCategory] = useState('')
+
+  // ── État TCO ────────────────────────────────────────────────────
+  const [tcoEntries,     setTcoEntries]     = useState<TCOEntry[]>([])
+  const [tcoLoading,     setTcoLoading]     = useState(false)
+  const tcoAgency    = globalAgency
+  const tcoCategory  = globalCategory
+
+  const fetchTco = useCallback(async () => {
+    setTcoLoading(true)
+    try {
+      const data = await tcoService.list(tcoAgency || undefined, tcoCategory || undefined)
+      const mapped = data.map((e: any) => ({
+        ...e,
+        vehicleRegistration: e.vehicleRegistration ?? e.vehicle?.registration ?? '',
+        agencyName:          e.agencyName          ?? e.vehicle?.agency?.name  ?? '',
+      }))
+      setTcoEntries(mapped)
+    } catch (err) { console.error('Erreur TCO :', err) }
+    finally { setTcoLoading(false) }
+  }, [tcoAgency, tcoCategory])
+
+  useEffect(() => { fetchTco() }, [fetchTco])
 
   useEffect(() => { fetchContracts() },    [])
   useEffect(() => { fetchAmortizations() }, [])
+  useEffect(() => { fetchAgencies() },      [])
+  useEffect(() => { fetchCategories() },    [])
 
-  const activeContracts    = useMemo(() => contracts.filter((c) => c.isActive && c.status === 'ACTIVE'), [contracts])
+  const filteredVehicles = useMemo(() => vehicles.filter((v) => {
+    if (globalAgency   && v.agencyId   !== globalAgency)   return false
+    if (globalCategory && v.categoryId !== globalCategory) return false
+    return true
+  }), [vehicles, globalAgency, globalCategory])
+
+  const filteredVehicleIds = useMemo(() => new Set(filteredVehicles.map((v) => v.id)), [filteredVehicles])
+
+  const activeContracts    = useMemo(() =>
+    contracts.filter((c) => c.isActive && c.status === 'ACTIVE' &&
+      (!globalAgency && !globalCategory ? true : filteredVehicleIds.has(c.vehicleId))
+    ), [contracts, filteredVehicleIds, globalAgency, globalCategory])
   const financialContracts = useMemo(() => activeContracts.filter((c) => c.type !== 'EN_PROPRIETE'), [activeContracts])
 
   const enriched = useMemo(() => activeContracts.map((c) => {
-    const v = vehicles.find((v) => v.id === c.vehicleId)
+    const v = filteredVehicles.find((v) => v.id === c.vehicleId) ?? vehicles.find((v) => v.id === c.vehicleId)
     return {
       contract:       c,
       vehicleName:    v ? `${v.registration} — ${v.brand} ${v.model}` : 'Véhicule inconnu',
@@ -190,7 +266,9 @@ export default function Finance() {
     const today        = new Date()
     const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
     return amortizations
-      .filter((a) => a.status === 'ACTIVE')
+      .filter((a) => a.status === 'ACTIVE' &&
+        (!globalAgency && !globalCategory ? true : filteredVehicleIds.has(a.vehicleId))
+      )
       .reduce((sum, a) => {
         const entry = a.entries.find((e) => e.month === currentMonth)
         return sum + (entry?.dotation ?? 0)
@@ -289,6 +367,50 @@ export default function Finance() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* ── Barre de filtres globaux ── */}
+        <div className="mt-4 pt-4 border-t border-white/10 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5 text-violet-300">
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Filtres</span>
+          </div>
+          <select
+            value={globalAgency}
+            onChange={(e) => setGlobalAgency(e.target.value)}
+            className="px-3 py-1.5 text-xs font-medium bg-white/10 border border-white/20 text-white rounded-lg outline-none cursor-pointer hover:bg-white/20 transition-colors"
+          >
+            <option value="" className="text-gray-900">Toutes les agences</option>
+            {agencies.map((a) => (
+              <option key={a.id} value={a.id} className="text-gray-900">{a.name}</option>
+            ))}
+          </select>
+          <select
+            value={globalCategory}
+            onChange={(e) => setGlobalCategory(e.target.value)}
+            className="px-3 py-1.5 text-xs font-medium bg-white/10 border border-white/20 text-white rounded-lg outline-none cursor-pointer hover:bg-white/20 transition-colors"
+          >
+            <option value="" className="text-gray-900">Toutes les catégories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id} className="text-gray-900">{c.label}</option>
+            ))}
+          </select>
+          {(globalAgency || globalCategory) && (
+            <button
+              onClick={() => { setGlobalAgency(''); setGlobalCategory('') }}
+              className="px-3 py-1.5 text-[10px] font-bold text-violet-300 hover:text-white border border-white/20 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              Réinitialiser
+            </button>
+          )}
+          {(globalAgency || globalCategory) && (
+            <span className="text-[10px] text-violet-400 italic">
+              {[
+                globalAgency   ? agencies.find((a) => a.id === globalAgency)?.name     : null,
+                globalCategory ? categories.find((c) => c.id === globalCategory)?.label : null,
+              ].filter(Boolean).join(' · ')}
+            </span>
+          )}
         </div>
       </div>
 
@@ -520,6 +642,58 @@ export default function Finance() {
           )}
         </div>
 
+        {/* ── Section TCO ── */}
+        <div className="space-y-4">
+
+          {/* Titre + filtres */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-4 rounded-full bg-violet-600" />
+                <h2 className="text-xs font-bold text-gray-600 uppercase tracking-wider">Coût total de possession (TCO)</h2>
+              </div>
+              <button
+                onClick={fetchTco}
+                disabled={tcoLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-40"
+              >
+                <RefreshCw className={`w-3 h-3 ${tcoLoading ? 'animate-spin' : ''}`} />
+                Actualiser
+              </button>
+            </div>
+
+            {/* KPIs TCO */}
+            {!tcoLoading && tcoEntries.length > 0 && (
+              <div className="p-4">
+                <TCOKPI
+                  totalCost={tcoEntries.reduce((s, t) => s + t.totalMonthlyCost, 0)}
+                  avgCostPerKm={tcoEntries.length ? tcoEntries.reduce((s, t) => s + t.costPerKm, 0) / tcoEntries.length : 0}
+                  maxCost={tcoEntries.reduce((max, t) => Math.max(max, t.totalMonthlyCost), 0)}
+                  vehicleCount={tcoEntries.length}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Graphique + tableau */}
+          {tcoLoading ? (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center text-sm text-gray-400 animate-pulse">
+              Chargement du TCO...
+            </div>
+          ) : tcoEntries.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+              <BarChart3 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+              <p className="text-sm font-bold text-gray-500">Aucune donnée TCO disponible</p>
+              <p className="text-xs text-gray-400 mt-1">Les TCO sont calculés automatiquement après chaque saisie de plein ou de maintenance.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <TCOPieChart tcoEntries={tcoEntries as any} />
+              <TCOTable    entries={tcoEntries as any} />
+            </div>
+          )}
+        </div>
+
         {/* ── Gantt amortissements ── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
@@ -528,13 +702,20 @@ export default function Finance() {
           </div>
           <div className="p-4">
             <AmortizationGantt
-              amortizations={amortizations}
+              amortizations={amortizations.filter((a) =>
+                !globalAgency && !globalCategory ? true : filteredVehicleIds.has(a.vehicleId)
+              )}
               title=""
               showVehicle={true}
               vehicleLabel={(vehicleId) => {
                 const v = vehicles.find((v) => v.id === vehicleId)
                 return v ? `${v.registration} — ${v.brand} ${v.model}` : vehicleId
               }}
+              onEdit={(amort) => setEditingAmort(amort)}
+            />
+            <AmortizationEditModal
+              amortization={editingAmort}
+              onClose={() => setEditingAmort(null)}
             />
           </div>
         </div>

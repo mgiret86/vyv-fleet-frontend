@@ -96,7 +96,7 @@ export default function VehiclePlateScanner({ isOpen, onClose, onBack, onConfirm
     brand:                     data.brand,
     model:                     data.model,
     energy:                    data.energy as VehicleEnergy,
-    category:                  guessCategoryId(data.ptac),
+    categoryId:                  guessCategoryId(data.ptac),
     technicalInspectionExpiry: data.technicalInspectionExpiry ?? '',
     mileage:                   0,
     complianceScore:           100,
@@ -106,11 +106,12 @@ export default function VehiclePlateScanner({ isOpen, onClose, onBack, onConfirm
     nextMaintenanceDate:       null,
     monthlyLeaseCost:          null,
     // ── Données carte grise (nouveaux champs) ───────────────────
-    color:                     data.color          ?? null,
-    vin:                       data.vin            ?? null,
-    nationalGenre:             data.nationalGenre  ?? null,
-    co2Emission:               data.co2            ?? null,
-    seatingCapacity:           data.seats          ?? null,
+    color:                     data.color                     ?? null,
+    vin:                       data.vin                       ?? null,
+    nationalGenre:             data.nationalGenre             ?? null,
+    co2Emission:               data.co2                       ?? null,
+    seatingCapacity:           data.seats                     ?? null,
+    firstRegistrationDate:     data.firstRegistrationDate     ?? null,
     }
   }
 

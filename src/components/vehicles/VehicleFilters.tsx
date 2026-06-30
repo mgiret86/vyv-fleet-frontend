@@ -29,7 +29,10 @@ export default function VehicleFilters({
   vehicleCount, visibleAgencyIds,
 }: Props) {
   const { agencies } = useAppStore()
-  const visibleAgencies = agencies.filter((a) => visibleAgencyIds.includes(a.id))
+  // Si visibleAgencyIds est vide, l'utilisateur voit tout (ex: SUPER_ADMIN)
+  const visibleAgencies = visibleAgencyIds.length === 0
+    ? agencies
+    : agencies.filter((a) => visibleAgencyIds.includes(a.id))
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
@@ -58,7 +61,7 @@ export default function VehicleFilters({
         </select>
 
         {/* Filtre agence */}
-        {visibleAgencies.length > 1 && (
+        {visibleAgencies.length > 0 && (
           <select
             value={agencyFilter}
             onChange={(e) => onAgencyChange(e.target.value)}

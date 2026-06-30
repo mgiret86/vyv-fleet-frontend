@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { VehicleContract, VehicleContractType, ContractStatus } from '@/types'
 import { MOCK_CONTRACTS } from '@/data/mockContracts'
+import { get, post, put, del } from '@/lib/api'
 
 // ─── Flag environnement (identique à dataService) ─────────────────────────────
-const USE_MOCK = true
+const USE_MOCK = false
 
 function fakeFetch<T>(data: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(structuredClone(data)), 150))
@@ -58,7 +59,7 @@ export interface KmStatus {
 export const contractService = {
   list: (): Promise<VehicleContract[]> => {
     if (USE_MOCK) return fakeFetch(MOCK_CONTRACTS)
-    // TODO: return get<VehicleContract[]>('/contracts')
+    return get<VehicleContract[]>('/vehicle-contracts')
     return fakeFetch(MOCK_CONTRACTS)
   },
   create: (data: ContractFormData): Promise<VehicleContract> => {
@@ -74,7 +75,7 @@ export const contractService = {
       }
       return fakeFetch(contract)
     }
-    // TODO: return post<VehicleContract>('/contracts', data)
+    return post<VehicleContract>('/vehicle-contracts', data)
     return fakeFetch({} as VehicleContract)
   },
   update: (id: string, data: Partial<ContractFormData>): Promise<VehicleContract> => {
@@ -82,7 +83,7 @@ export const contractService = {
       console.info('[MOCK] updateContract', id, data)
       return fakeFetch({ ...data, id, updatedAt: now() } as VehicleContract)
     }
-    // TODO: return put<VehicleContract>(`/contracts/${id}`, data)
+    return put<VehicleContract>(`/vehicle-contracts/${id}`, data)
     return fakeFetch({} as VehicleContract)
   },
   terminate: (id: string): Promise<void> => {
@@ -90,7 +91,7 @@ export const contractService = {
       console.info('[MOCK] terminateContract', id)
       return fakeFetch(undefined as void)
     }
-    // TODO: return put<void>(`/contracts/${id}/terminate`, {})
+    return put<void>(`/vehicle-contracts/${id}/terminate`, {})
     return fakeFetch(undefined as void)
   },
   remove: (id: string): Promise<void> => {
@@ -98,7 +99,7 @@ export const contractService = {
       console.info('[MOCK] deleteContract', id)
       return fakeFetch(undefined as void)
     }
-    // TODO: return del<void>(`/contracts/${id}`)
+    return del<void>(`/vehicle-contracts/${id}`)
     return fakeFetch(undefined as void)
   },
 }
@@ -238,6 +239,6 @@ export const useVehicleContractStore = create<VehicleContractState>()(
         }
       },
     }),
-    { name: 'vyv-vehicle-contracts', version: 1 }
+    { name: 'vyv-vehicle-contracts', version: 2 }
   )
 )

@@ -1,7 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   Euro, Clock, Gauge, AlertTriangle, FileText,
   CheckCircle2, XCircle, Calendar, Building2, Plus, Pencil, TrendingUp,
+  RefreshCw, BarChart3,
 } from 'lucide-react'
 import { useVehicleContractStore }  from '@/store/vehicleContractStore'
 import type { ContractFormData }    from '@/store/vehicleContractStore'
@@ -10,6 +11,7 @@ import VehicleContractForm          from './VehicleContractForm'
 import AmortizationGantt            from '@/components/amortization/AmortizationGantt'
 import CreditBailAmortizationModal  from '@/components/amortization/CreditBailAmortizationModal'
 import type { Vehicle, VehicleContract, VehicleContractType } from '@/types'
+import { tcoService } from '@/lib/services'
 
 // ─── Helpers ──────────────────────────────────────────────────────
 function formatEur(n: number): string {
@@ -297,6 +299,153 @@ function ContractCard({
   )
 }
 
+
+// ─── VehicleTCOBlock ──────────────────────────────────────────────
+interface TCOData {
+  monthlyLease:        number
+  monthlyFuel:         number
+  monthlyMaintenance:  number
+  monthlyInsurance:    number
+  monthlyOther:        number
+  totalMonthlyCost:    number
+  annualCost:          number
+  costPerKm:           number
+  updatedAt:           string
+}
+
+function VehicleTCOBlock({ vehicleId }: { vehicleId: string }) {
+  const [tco,       setTco]       = useState<TCOData | null>(null)
+  const [loading,   setLoading]   = useState(true)
+  const [computing, setComputing] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const data = await tcoService.getByVehicle(vehicleId)
+      setTco(data)
+    } catch { setTco(null) }
+    finally { setLoading(false) }
+  }, [vehicleId])
+
+  useEffect(() => { load() }, [load])
+
+  const handleRecompute = async () => {
+    setComputing(true)
+    try {
+      const data = await tcoService.compute(vehicleId)
+      setTco(data)
+    } catch (e) { console.error(e) }
+    finally { setComputing(false) }
+  }
+
+  const fmtEur = (n: number) =>
+    n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 })
+
+  const POSTES = tco ? [
+    { label: 'Location / Leasing',  value: tco.monthlyLease,        color: 'bg-violet-500' },
+    { label: 'Carburant',           value: tco.monthlyFuel,          color: 'bg-blue-500'   },
+    { label: 'Maintenance',         value: tco.monthlyMaintenance,   color: 'bg-orange-500' },
+    { label: 'Assurance',           value: tco.monthlyInsurance,     color: 'bg-green-500'  },
+    { label: 'Amortissements',      value: tco.monthlyOther,         color: 'bg-gray-400'   },
+  ] : []
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* En-tête */}
+      <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 rounded-full bg-violet-600" />
+          <BarChart3 className="w-3.5 h-3.5 text-violet-600" />
+          <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+            Coût total de possession (TCO)
+          </span>
+        </div>
+        <button
+          onClick={handleRecompute}
+          disabled={computing || loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-violet-600 bg-white hover:bg-violet-50 rounded-lg transition-colors border border-violet-200 disabled:opacity-40"
+        >
+          <RefreshCw className={`w-3 h-3 ${computing ? 'animate-spin' : ''}`} />
+          Recalculer
+        </button>
+      </div>
+
+      {/* Corps */}
+      <div className="p-5">
+        {loading ? (
+          <p className="text-xs text-gray-400 text-center animate-pulse py-4">Chargement...</p>
+        ) : !tco ? (
+          <div className="text-center py-6">
+            <BarChart3 className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+            <p className="text-xs text-gray-500 font-medium">Aucun TCO calculé</p>
+            <p className="text-[10px] text-gray-400 mt-1 mb-3">
+              Cliquez sur "Recalculer" pour générer le TCO de ce véhicule.
+            </p>
+            <button
+              onClick={handleRecompute}
+              disabled={computing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition-colors disabled:opacity-40"
+            >
+              <RefreshCw className={`w-3 h-3 ${computing ? 'animate-spin' : ''}`} />
+              Calculer le TCO
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Total mensuel mis en avant */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 text-center">
+                <p className="text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1">Total mensuel</p>
+                <p className="text-2xl font-black text-violet-700">{fmtEur(tco.totalMonthlyCost)}</p>
+              </div>
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût annuel estimé</p>
+                <p className="text-2xl font-black text-gray-800">{fmtEur(tco.annualCost)}</p>
+              </div>
+            </div>
+
+            {/* Détail des postes */}
+            <div className="space-y-2">
+              {POSTES.map(({ label, value, color }) => {
+                const pct = tco.totalMonthlyCost > 0 ? (value / tco.totalMonthlyCost) * 100 : 0
+                return (
+                  <div key={label} className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold text-gray-500 w-36 flex-shrink-0">{label}</span>
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${color}`} style={{ width: `${pct.toFixed(1)}%` }} />
+                    </div>
+                    <span className="text-[11px] font-bold text-gray-700 w-20 text-right flex-shrink-0">
+                      {fmtEur(value)}
+                    </span>
+                    <span className="text-[10px] text-gray-400 w-10 text-right flex-shrink-0">
+                      {pct.toFixed(0)} %
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Coût au km */}
+            {tco.costPerKm > 0 && (
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Coût par km</span>
+                <span className="text-sm font-black text-gray-800">{tco.costPerKm.toFixed(2)} €/km</span>
+              </div>
+            )}
+
+            {/* Dernière mise à jour */}
+            <p className="text-[10px] text-gray-300 text-right">
+              Mis à jour le {new Date(tco.updatedAt).toLocaleDateString('fr-FR', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+              })}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Composant principal ──────────────────────────────────────────
 export default function VehicleFinanceTab({ vehicle }: { vehicle: Vehicle }) {
   const { fetchContracts, getByVehicle, getActive, addContract, updateContract } = useVehicleContractStore()
@@ -344,6 +493,9 @@ export default function VehicleFinanceTab({ vehicle }: { vehicle: Vehicle }) {
 
   return (
     <div className="space-y-4">
+
+      {/* ── TCO véhicule ── */}
+      <VehicleTCOBlock vehicleId={vehicle.id} />
 
       {/* ── Bouton créer ── */}
       <div className="flex justify-end">

@@ -10,6 +10,9 @@ export type AppModule =
   | 'fuel'
   | 'equipment'
   | 'settings'
+  | 'finance'
+  | 'substitutions'
+  | 'relais'
 
 export type ModulePermissions = {
   view: boolean
@@ -28,6 +31,9 @@ export type Permissions = {
   fuel: ModulePermissions
   equipment: ModulePermissions
   settings: ModulePermissions
+  finance: ModulePermissions
+  substitutions: ModulePermissions
+  relais: ModulePermissions
 }
 
 export type RoleColor = 'violet' | 'blue' | 'green' | 'gray'

@@ -82,6 +82,14 @@ export const useAuthStore = create<AuthState>()(
               { module: 'incidents', action: 'view' },
               { module: 'settings', action: 'view' },
               { module: 'settings', action: 'edit' },
+              { module: 'substitutions', action: 'view' },
+              { module: 'substitutions', action: 'create' },
+              { module: 'substitutions', action: 'edit' },
+              { module: 'substitutions', action: 'delete' },
+              { module: 'relais', action: 'view' },
+              { module: 'relais', action: 'create' },
+              { module: 'relais', action: 'edit' },
+              { module: 'relais', action: 'delete' },
             ]
           }
 

@@ -35,7 +35,7 @@ export interface Vehicle {
   registration: string
   brand: string
   model: string
-  category: string   // id dynamique de VehicleCategory
+  categoryId: string   // id dynamique de VehicleCategory
   status: 'ACTIVE' | 'MAINTENANCE' | 'IMMOBILIZED' | 'DECOMMISSIONED' | 'PENDING_APPROVAL' | 'IN_TRANSFER'
   agencyId: string
   agencyName: string
@@ -55,7 +55,12 @@ export interface Vehicle {
   seatingCapacity: number | null   // Nombre de places assises (S.1)
   // ── Matériels embarqués ──────────────────────────────────────
   imeiPda:         string | null   // N° IMEI PDA
-  imeiTelematics:  string | null   // N° IMEI Boitier Télématique
+  imeiTelematics:        string | null
+  firstRegistrationDate:  string | null
+  entryDate:              string | null
+  exitDate:               string | null
+  taxiMeterControlExpiry: string | null
+  isRelais:              boolean
 }
 
 // Types dérivés de Vehicle
@@ -368,3 +373,57 @@ export interface VehicleContract {
   createdAt: string
   updatedAt: string
 }
+
+// ─────────────────────────────────────────────────────────────────
+// RELAIS — Véhicules de remplacement temporaire
+// ─────────────────────────────────────────────────────────────────
+
+export type RelaisMissionStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
+
+export interface RelaisDepot {
+  id:        string
+  name:      string
+  address:   string | null
+  city:      string | null
+  zipCode:   string | null
+  phone:     string | null
+  capacity:  number
+  agencyId:  string | null
+
+  notes:     string | null
+  createdAt: string
+  updatedAt: string
+  agency?:   { id: string; name: string }
+  vehicles?: (Vehicle & { agency: { id: string; name: string } })[]
+  missions?: RelaisMission[]
+}
+
+export interface RelaisMission {
+  id:                string
+  relaisVehicleId:   string
+  replacedVehicleId: string
+  depotId:           string | null
+  startDate:         string
+  estimatedEndDate:  string | null
+  endDate:           string | null
+  status:            RelaisMissionStatus
+  reason:            string | null
+  notes:             string | null
+  createdById:       string
+  createdAt:         string
+  updatedAt:         string
+  relaisVehicle?:    Vehicle & { agency: { id: string; name: string }; relaisDepot?: RelaisDepot | null }
+  replacedVehicle?:  Vehicle & { agency: { id: string; name: string } }
+  depot?:            RelaisDepot | null
+  createdBy?:        { id: string; firstName: string; lastName: string }
+}
+
+export interface RelaisKPIs {
+  totalRelais:      number
+  activeMissions:   number
+  occupancyRate:    number
+  avgDurationDays:  number
+  lateMissions:     number
+  topVehicles:      { relaisVehicleId: string; _count: { relaisVehicleId: number } }[]
+}
+

@@ -18,7 +18,9 @@ import Equipment    from '@/pages/Equipment'
 import Drivers      from '@/pages/Drivers'
 import DriverDetail from '@/pages/DriverDetail'
 import Settings     from '@/pages/Settings'
-import Finance      from '@/pages/Finance'
+import Finance        from '@/pages/Finance'
+import Substitutions  from '@/pages/Substitutions'
+import Relais         from '@/pages/Relais'
 
 function AppRoutes() {
   const checkSession = useAuthStore((s) => s.checkSession)
@@ -54,7 +56,9 @@ function AppRoutes() {
         <Route path="fuel"         element={<ProtectedRoute module="fuel"><Fuel /></ProtectedRoute>} />
         <Route path="equipment"    element={<ProtectedRoute module="equipment"><Equipment /></ProtectedRoute>} />
         <Route path="settings"     element={<ProtectedRoute module="settings"><Settings /></ProtectedRoute>} />
-        <Route path="finance"      element={<Finance />} />
+        <Route path="finance"      element={<ProtectedRoute module="finance"><Finance /></ProtectedRoute>} />
+        <Route path="substitutions" element={<ProtectedRoute module="substitutions"><Substitutions /></ProtectedRoute>} />
+        <Route path="relais"         element={<ProtectedRoute module="relais"><Relais /></ProtectedRoute>} />
         <Route path="*"            element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

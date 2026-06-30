@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { TrendingDown, CheckCircle2, Clock } from 'lucide-react'
+import { TrendingDown, CheckCircle2, Clock, Pencil } from 'lucide-react'
 import type { Amortization } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ interface AmortizationGanttProps {
   title?:        string
   showVehicle?:  boolean // true = page Finance (flotte), false = fiche véhicule
   vehicleLabel?: (vehicleId: string) => string
+  onEdit?:      (amort: Amortization) => void
 }
 
 export default function AmortizationGantt({
@@ -30,6 +31,7 @@ export default function AmortizationGantt({
   title        = 'Suivi des amortissements',
   showVehicle  = false,
   vehicleLabel = (id) => id,
+  onEdit,
 }: AmortizationGanttProps) {
 
   // ─── Calcul de la fenêtre temporelle ──────────────────────────
@@ -308,7 +310,8 @@ export default function AmortizationGantt({
                 <tr className="bg-gray-50 text-left">
                   {[
                     'Libellé', 'Source', 'Réf. comptable',
-                    'Montant', 'Dotation/mois', 'Début', 'Fin', 'VNC', 'Statut'
+                    'Montant', 'Dotation/mois', 'Début', 'Fin', 'VNC', 'Statut',
+                    ...(onEdit ? ['Actions'] : []),
                   ].map((h) => (
                     <th key={h} className="px-3 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
@@ -364,6 +367,18 @@ export default function AmortizationGantt({
                           </span>
                         )}
                       </td>
+                      {onEdit && (
+                        <td className="px-3 py-2.5">
+                          <button
+                            onClick={() => onEdit(amort)}
+                            className="flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-lg px-2 py-1 transition-colors"
+                            title="Modifier"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Modifier
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

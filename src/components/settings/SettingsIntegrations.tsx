@@ -1,51 +1,69 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Plug, Eye, EyeOff, CheckCircle2, XCircle,
   Loader2, ExternalLink, Trash2, Save, FlaskConical,
 } from 'lucide-react'
 import { useSettingsStore } from '@/store/settingsStore'
 import { testRegistrationApiConnection } from '@/lib/registrationService'
+import { useAuthStore } from '../../store/useAuthStore'
 
 export default function SettingsIntegrations() {
   const {
     integrations,
-    setRegistrationApiKey,
-    setRegistrationApiEnabled,
     setRegistrationApiTestResult,
-    clearRegistrationApiKey,
   } = useSettingsStore()
 
   const reg = integrations.registrationApi
 
-  const [inputKey,   setInputKey]   = useState(reg.key)
+  const [inputKey,   setInputKey]   = useState('')
   const [showKey,    setShowKey]    = useState(false)
   const [testing,    setTesting]    = useState(false)
   const [saving,     setSaving]     = useState(false)
+  const [savedKey,   setSavedKey]  = useState('')
   const [testResult, setTestResult] = useState<'ok' | 'error' | null>(null)
   const [testError,  setTestError]  = useState<string | null>(null)
   const [dirty,      setDirty]      = useState(false)
 
+  // Charger la cle depuis le backend au montage
+  useEffect(() => {
+    const token = useAuthStore.getState().accessToken ?? ''
+    fetch('/api/settings', { headers: { 'Authorization': `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((json) => {
+        const key = json?.data?.rapidapi_key ?? ''
+        setSavedKey(key)
+        setInputKey(key)
+      })
+      .catch(() => {})
+  }, [])
+
   const handleKeyChange = (v: string) => {
     setInputKey(v)
-    setDirty(v !== reg.key)
+    setDirty(v !== savedKey)
     setTestResult(null)
   }
 
   const handleSave = async () => {
     setSaving(true)
-    await new Promise((r) => setTimeout(r, 300)) // micro-délai UX
-    setRegistrationApiKey(inputKey.trim())
-    setDirty(false)
-    setSaving(false)
+    try {
+      const token = useAuthStore.getState().accessToken ?? ''
+      await fetch('/api/settings', {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body:    JSON.stringify({ rapidapi_key: inputKey.trim() }),
+      })
+      setSavedKey(inputKey.trim())
+      setDirty(false)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleTest = async () => {
-    const keyToTest = dirty ? inputKey.trim() : reg.key
-    if (!keyToTest) return
     setTesting(true)
     setTestResult(null)
     setTestError(null)
-    const result = await testRegistrationApiConnection(keyToTest)
+    const result = await testRegistrationApiConnection()
     setTesting(false)
     if (result.success) {
       setTestResult('ok')
@@ -57,11 +75,17 @@ export default function SettingsIntegrations() {
     }
   }
 
-  const handleClear = () => {
+  const handleClear = async () => {
+    const token = useAuthStore.getState().accessToken ?? ''
+    await fetch('/api/settings', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ rapidapi_key: ''  }),
+    })
     setInputKey('')
+    setSavedKey('')
     setDirty(false)
     setTestResult(null)
-    clearRegistrationApiKey()
   }
 
   const formatDate = (iso: string | null) => {
@@ -72,7 +96,7 @@ export default function SettingsIntegrations() {
     })
   }
 
-  const isConfigured = reg.key && reg.key.length > 10
+  const isConfigured = savedKey && savedKey.length > 10
 
   return (
     <div className="space-y-6">
@@ -110,14 +134,10 @@ export default function SettingsIntegrations() {
             {/* Toggle activer/désactiver */}
             {isConfigured && (
               <button
-                onClick={() => setRegistrationApiEnabled(!reg.enabled)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  reg.enabled ? 'bg-violet-600' : 'bg-gray-200'
-                }`}
+                onClick={handleClear}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-full hover:bg-red-50 transition-colors"
               >
-                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                  reg.enabled ? 'translate-x-4' : 'translate-x-1'
-                }`} />
+                <XCircle className="w-3.5 h-3.5" /> Désactiver
               </button>
             )}
           </div>
@@ -198,7 +218,7 @@ export default function SettingsIntegrations() {
           <div className="flex items-center gap-4">
             <button
               onClick={handleTest}
-              disabled={testing || (!inputKey && !reg.key)}
+              disabled={testing || (!inputKey && !savedKey)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-violet-700 border border-violet-200 rounded-lg hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {testing
@@ -236,8 +256,8 @@ export default function SettingsIntegrations() {
           <div className="pt-2 border-t border-gray-100">
             <p className="text-xs text-gray-400">
               Mode actuel :{' '}
-              <span className={`font-medium ${reg.enabled && isConfigured ? 'text-violet-600' : 'text-orange-500'}`}>
-                {reg.enabled && isConfigured ? 'API réelle activée' : 'Mode démonstration (données fictives)'}
+              <span className={`font-medium ${isConfigured ? 'text-violet-600' : 'text-orange-500'}`}>
+                {isConfigured ? 'API réelle activée' : 'Mode démonstration (données fictives)'}
               </span>
             </p>
           </div>
